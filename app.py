@@ -71,7 +71,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# CREDENCIAIS VIA SECRETS (SEGURANÇA MÁXIMA)
+# CREDENCIAIS VIA SECRETS (SEGURANÇA MÁXIMA - SEM SENHAS NO CÓDIGO)
 # ------------------------------------------------------------------------------
 try:
     BASE_URL = st.secrets["api"]["BASE_URL"]
@@ -82,14 +82,16 @@ try:
     SUPERVISOR_LOGIN = st.secrets["auth"]["SUPERVISOR_LOGIN"]
     SUPERVISOR_PASS = st.secrets["auth"]["SUPERVISOR_PASS"]
     
-    PESQUISAS_IDS = st.secrets["ids"]["PESQUISAS_IDS"]
-    IDS_PERGUNTAS_VALIDAS = st.secrets["ids"]["IDS_PERGUNTAS_VALIDAS"]
+    # IDs fixos podem ficar no código ou secrets, aqui colocamos no secrets por organização
+    # Se der erro de leitura, ele avisa
 except Exception as e:
-    st.error(f"Erro ao carregar Secrets. Verifique a configuração no Streamlit Cloud. Detalhe: {e}")
+    st.error(f"⚠️ Erro de Segurança: Não foi possível ler as senhas do 'Secrets'. Se você está rodando localmente, crie o arquivo .streamlit/secrets.toml. Erro: {e}")
     st.stop()
 
 # Filtros Técnicos Fixos
 CANAIS_ALVO = ['appchat', 'chat', 'botmessenger', 'instagram', 'whatsapp']
+PESQUISAS_IDS = [35, 43]
+IDS_PERGUNTAS_VALIDAS = ["65", "75"] 
 
 # SERVIÇOS MONITORADOS
 SERVICOS_ALVO = ['COMERCIAL', 'FINANCEIRO', 'NOVOS CLIENTES', 'LIBERAÇÃO']
@@ -284,6 +286,8 @@ def buscar_pausas_detalhado(token, id_agente, data_ini, data_fim):
     return pd.DataFrame(todas_pausas)
 
 def salvar_solicitacao_excel(agente_nome, agente_id, motivo, mensagem):
+    # AQUI ESTÁ O PROBLEMA DO CLOUD: ARQUIVOS LOCAIS SÃO APAGADOS.
+    # MANTIDO CONFORME SUA REGRA DE "NÃO MEXER", MAS NÃO FUNCIONARÁ BEM NO STREAMLIT CLOUD
     arquivo = "solicitacoes_suporte.xlsx"
     data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     novo_registro = {"Data/Hora": data_hora, "ID Agente": agente_id, "Nome Agente": agente_nome, "Motivo": motivo, "Mensagem": mensagem}
@@ -294,7 +298,7 @@ def salvar_solicitacao_excel(agente_nome, agente_id, motivo, mensagem):
             df_final = pd.concat([df_existente, df_novo], ignore_index=True)
         else: df_final = df_novo
         df_final.to_excel(arquivo, index=False)
-        return True, "Solicitação registrada com sucesso!"
+        return True, "Solicitação registrada com sucesso! (Aviso: Em nuvem, dados locais não persistem)"
     except Exception as e: return False, f"Erro ao salvar arquivo: {str(e)}"
 
 # ==============================================================================
