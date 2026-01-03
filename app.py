@@ -4,6 +4,8 @@ import requests
 import os
 import concurrent.futures
 import time
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 
 # ==============================================================================
@@ -71,7 +73,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# CREDENCIAIS VIA SECRETS (SEGURANÇA MÁXIMA - SEM SENHAS NO CÓDIGO)
+# CREDENCIAIS VIA SECRETS (SEGURANÇA ATIVADA)
 # ------------------------------------------------------------------------------
 try:
     BASE_URL = st.secrets["api"]["BASE_URL"]
@@ -82,16 +84,14 @@ try:
     SUPERVISOR_LOGIN = st.secrets["auth"]["SUPERVISOR_LOGIN"]
     SUPERVISOR_PASS = st.secrets["auth"]["SUPERVISOR_PASS"]
     
-    # IDs fixos podem ficar no código ou secrets, aqui colocamos no secrets por organização
-    # Se der erro de leitura, ele avisa
+    PESQUISAS_IDS = st.secrets["ids"]["PESQUISAS_IDS"]
+    IDS_PERGUNTAS_VALIDAS = st.secrets["ids"]["IDS_PERGUNTAS_VALIDAS"]
 except Exception as e:
-    st.error(f"⚠️ Erro de Segurança: Não foi possível ler as senhas do 'Secrets'. Se você está rodando localmente, crie o arquivo .streamlit/secrets.toml. Erro: {e}")
+    st.error(f"Erro crítico: Não foi possível carregar os Segredos (Secrets). Verifique a configuração no Streamlit Cloud. Detalhe: {e}")
     st.stop()
 
 # Filtros Técnicos Fixos
 CANAIS_ALVO = ['appchat', 'chat', 'botmessenger', 'instagram', 'whatsapp']
-PESQUISAS_IDS = [35, 43]
-IDS_PERGUNTAS_VALIDAS = ["65", "75"] 
 
 # SERVIÇOS MONITORADOS
 SERVICOS_ALVO = ['COMERCIAL', 'FINANCEIRO', 'NOVOS CLIENTES', 'LIBERAÇÃO']
@@ -285,21 +285,44 @@ def buscar_pausas_detalhado(token, id_agente, data_ini, data_fim):
         except: break
     return pd.DataFrame(todas_pausas)
 
-def salvar_solicitacao_excel(agente_nome, agente_id, motivo, mensagem):
-    # AQUI ESTÁ O PROBLEMA DO CLOUD: ARQUIVOS LOCAIS SÃO APAGADOS.
-    # MANTIDO CONFORME SUA REGRA DE "NÃO MEXER", MAS NÃO FUNCIONARÁ BEM NO STREAMLIT CLOUD
-    arquivo = "solicitacoes_suporte.xlsx"
-    data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    novo_registro = {"Data/Hora": data_hora, "ID Agente": agente_id, "Nome Agente": agente_nome, "Motivo": motivo, "Mensagem": mensagem}
+# ==============================================================================
+# FUNÇÕES DE BANCO DE DADOS (GOOGLE SHEETS) - SUBSTITUI O EXCEL
+# ==============================================================================
+
+def conectar_gsheets():
     try:
-        df_novo = pd.DataFrame([novo_registro])
-        if os.path.exists(arquivo):
-            df_existente = pd.read_excel(arquivo)
-            df_final = pd.concat([df_existente, df_novo], ignore_index=True)
-        else: df_final = df_novo
-        df_final.to_excel(arquivo, index=False)
-        return True, "Solicitação registrada com sucesso! (Aviso: Em nuvem, dados locais não persistem)"
-    except Exception as e: return False, f"Erro ao salvar arquivo: {str(e)}"
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        # Pega as credenciais do Secrets
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        # Abre a planilha pelo nome exato
+        sheet = client.open("solicitacoes_nrc").sheet1
+        return sheet
+    except Exception as e:
+        return None
+
+def salvar_solicitacao_gsheets(nome, id_agente, motivo, mensagem):
+    sheet = conectar_gsheets()
+    if sheet:
+        data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        try:
+            # Adiciona linha: Data, ID, Nome, Motivo, Mensagem
+            sheet.append_row([data_hora, id_agente, nome, motivo, mensagem])
+            return True, "Solicitação salva na nuvem com sucesso!"
+        except Exception as e:
+            return False, f"Erro ao escrever na planilha: {e}"
+    else:
+        return False, "Erro de conexão com Google Sheets. Verifique o compartilhamento."
+
+def ler_solicitacoes_gsheets():
+    sheet = conectar_gsheets()
+    if sheet:
+        try:
+            data = sheet.get_all_records()
+            return pd.DataFrame(data)
+        except: return pd.DataFrame()
+    return pd.DataFrame()
 
 # ==============================================================================
 # 4. FUNÇÕES DO SUPERVISOR (VERSÃO GOLD 9.0)
@@ -683,12 +706,13 @@ def barra_lateral_com_changelog():
         else: d_ini = st.date_input("Início", hoje-timedelta(1)); d_fim = st.date_input("Fim", hoje)
         st.info(f"De: {d_ini.strftime('%d/%m')} até {d_fim.strftime('%d/%m')}")
         st.markdown("---")
-        with st.expander("📜 Versão Gold 9.0"):
+        with st.expander("📜 Versão Platinum 10.0"):
             st.markdown("""
-            **v9.0 - Tempo Real**
-            - **Novo:** Monitoramento em tempo real de agentes online.
-            - **Gestão:** Botão para deslogar agente (somente equipe NRC).
-            - **v8.0:** Visão Individual (Espião).
+            **v10.0 - Cloud Ready**
+            - **Segurança:** Integração com Secrets do Streamlit (Sem senhas no código).
+            - **Google Sheets:** Integração completa para salvar solicitações na nuvem.
+            - **v9.0:** Tempo Real.
+            - **v8.0:** Visão Individual.
             """)
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.auth_status = False; st.session_state.user_data = None; st.rerun()
@@ -854,7 +878,7 @@ else:
                     with st.spinner("Salvando solicitação..."):
                         if motivo == "Denúncia Anônima": nome_save = "ANÔNIMO"; id_save = "ANÔNIMO"
                         else: nome_save = target_name; id_save = target_id
-                        sucesso, retorno = salvar_solicitacao_excel(nome_save, id_save, motivo, msg)
+                        sucesso, retorno = salvar_solicitacao_gsheets(nome_save, id_save, motivo, msg)
                         if sucesso: st.success("✅ " + retorno)
                         else: st.error(retorno)
 
@@ -1002,6 +1026,8 @@ else:
 
         # ABA 5: SOLICITAÇÕES
         with abas_sup[4]:
-            if os.path.exists("solicitacoes_suporte.xlsx"):
-                st.dataframe(pd.read_excel("solicitacoes_suporte.xlsx"), use_container_width=True)
-            else: st.warning("Nenhuma solicitação.")
+            st.info("Visualização das solicitações registradas no Google Sheets.")
+            df_gs = ler_solicitacoes_gsheets()
+            if not df_gs.empty:
+                st.dataframe(df_gs, use_container_width=True)
+            else: st.warning("Nenhuma solicitação encontrada na planilha.")
