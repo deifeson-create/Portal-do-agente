@@ -459,8 +459,33 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim):
     }
 
     if not ids_agentes: return resultados, 0.0, 0, mapa_agentes
+    
+    # 2. Dados Globais NRC (Estatísticas Agrupadas por Conta filtradas pelos Agentes NRC)
+    # Importante: Como queremos os totais dos agentes do NRC, podemos usar o agrupador 'conta'
+    # mas filtrando pelos IDs dos agentes. A API deve retornar o somatório.
+    dados_globais = {"tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--"}
+    
+    try:
+        params_globais = {
+            "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+            "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+            "agrupador": "conta", 
+            "agente[]": ids_agentes,
+            "canal[]": ids_canais,
+            "id_conta": ID_CONTA
+        }
+        r_global = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params_globais)
+        if r_global.status_code == 200:
+            lista_global = r_global.json()
+            if lista_global and isinstance(lista_global, list):
+                item_global = lista_global[0]
+                dados_globais["tma"] = item_global.get("tma", "--:--")
+                dados_globais["tme"] = item_global.get("tme", "--:--")
+                dados_globais["tmia"] = item_global.get("tmia", "--:--")
+                dados_globais["tmic"] = item_global.get("tmic", "--:--")
+    except: pass
 
-    # 2. Estatísticas (Por Serviço)
+    # 3. Estatísticas (Por Serviço)
     for servico in SERVICOS_ALVO:
         params = {
             "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
@@ -486,7 +511,7 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim):
                     resultados[servico]["tmic"] = item.get("tmic", "--:--")
         except: pass
 
-    # 3. Satisfação (CSAT)
+    # 4. Satisfação (CSAT)
     csat_geral_pos = 0; csat_geral_total = 0
     for p_id in PESQUISAS_IDS:
         p_page = 1
@@ -526,7 +551,7 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim):
             except: break
 
     score_geral = (csat_geral_pos / csat_geral_total * 100) if csat_geral_total > 0 else 0.0
-    return resultados, score_geral, csat_geral_total, mapa_agentes
+    return resultados, score_geral, csat_geral_total, mapa_agentes, dados_globais
 
 def _processar_agente_pausas(token, cod_agente, nome_agente, data_ini, data_fim):
     headers = {"Authorization": f"Bearer {token}"}
@@ -827,6 +852,13 @@ def render_top_bar(nome, id_agente):
     </div>
     """, unsafe_allow_html=True)
 
+def gerar_link_protocolo(protocolo):
+    if not protocolo: return None
+    s_proto = str(protocolo).strip()
+    if len(s_proto) < 7: suffix = s_proto
+    else: suffix = s_proto[-7:]
+    return f"https://ateltelecom.matrixdobrasil.ai/atendimento/view/cod_atendimento/{suffix}/readonly/true#atendimento-div"
+
 def barra_lateral_com_changelog():
     with st.sidebar:
         st.header("📅 Filtros")
@@ -839,10 +871,10 @@ def barra_lateral_com_changelog():
         else: d_ini = st.date_input("Início", hoje-timedelta(1)); d_fim = st.date_input("Fim", hoje)
         st.info(f"De: {d_ini.strftime('%d/%m')} até {d_fim.strftime('%d/%m')}")
         st.markdown("---")
-        with st.expander("📜 Versão Platinum 14.0"):
+        with st.expander("📜 Versão Platinum 15.0"):
             st.markdown("""
-            **v14.0 - Final Definitiva**
-            - **Visão Geral:** Cards expandidos (TMA, TME, TMIA, TMIC, Vol, CSAT).
+            **v15.0 - Final Definitiva**
+            - **Visão Geral:** Cards expandidos (TMA, TME, TMIA, TMIC, Vol, CSAT) + Cards Globais.
             - **Segurança:** Bloqueio Mestre + Secrets.
             - **Visual:** Cards e Tabelas originais restaurados (Regra de Ouro).
             - **Dados:** Integração Google Sheets.
@@ -893,7 +925,7 @@ else:
     if st.session_state.user_role == "supervisor":
         # Carrega lista apenas para o selectbox
         with st.spinner("Carregando equipe..."):
-            _, _, _, mapa_agentes_sidebar = buscar_dados_completos_supervisor(token, d_inicial, d_final)
+            _, _, _, mapa_agentes_sidebar, _ = buscar_dados_completos_supervisor(token, d_inicial, d_final)
         
         st.sidebar.markdown("---")
         st.sidebar.header("👤 Visão Individual")
@@ -1037,19 +1069,30 @@ else:
         
         abas_sup = st.tabs(["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações"])
         
-        # ABA 1: VISÃO GERAL (6 CARDS POR SERVIÇO)
+        # ABA 1: VISÃO GERAL (AGORA COM OS CARDS GLOBAIS + 6 CARDS POR SERVIÇO)
         with abas_sup[0]:
             if token:
                 with st.spinner("Sincronizando estatísticas..."):
-                    dados_servicos, csat_geral, base_geral, mapa_agentes = buscar_dados_completos_supervisor(token, d_inicial, d_final)
+                    dados_servicos, csat_geral, base_geral, mapa_agentes, dados_globais = buscar_dados_completos_supervisor(token, d_inicial, d_final)
                     
                     st.markdown("#### ⭐ Visão Global da Equipe")
+                    
+                    # LINHA 1: CSAT + Ferramenta (Original)
                     col_kpi1, col_kpi2 = st.columns([1, 2])
                     with col_kpi1:
                         cor_geral = "#10b981" if csat_geral >= 85 else ("#f59e0b" if csat_geral >= 75 else "#ef4444")
                         render_kpi_card("CSAT Global (NRC)", f"{csat_geral:.1f}%", f"Base Total: {base_geral}", cor_geral)
                     with col_kpi2:
                         render_link_card("Ferramenta Externa", "https://fideliza-nator-live.streamlit.app/", "FIDELIZA-NATOR")
+
+                    # LINHA 2: CARDS DE TEMPO GLOBAIS (NOVO)
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    c_g1, c_g2, c_g3, c_g4 = st.columns(4)
+                    with c_g1: render_kpi_card("T.M.A (Global)", dados_globais["tma"], "Tempo Médio Atend.", "#3b82f6")
+                    with c_g2: render_kpi_card("T.M.E (Global)", dados_globais["tme"], "Tempo Médio Esp.", "#ef4444")
+                    with c_g3: render_kpi_card("T.M.I.A (Global)", dados_globais["tmia"], "Inativ. Agente", "#f59e0b")
+                    with c_g4: render_kpi_card("T.M.I.C (Global)", dados_globais["tmic"], "Inativ. Cliente", "#6366f1")
+
                     st.markdown("---")
                     
                     for servico in SERVICOS_ALVO:
@@ -1060,6 +1103,7 @@ else:
                         pos_s = dado["csat_pos"]
                         score_s = (pos_s / total_s * 100) if total_s > 0 else 0.0
                         
+                        # LAYOUT EXPANDIDO (6 CARDS)
                         col1, col2, col3, col4, col5, col6 = st.columns(6)
                         
                         with col1: render_kpi_card("Volume", str(dado["num_qtd"]), "Atendimentos", "#8b5cf6")
