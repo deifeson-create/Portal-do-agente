@@ -18,25 +18,85 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ESTILOS CSS
+# 🔒 BLOQUEIO DE SEGURANÇA (SENHA MESTRA)
+if "app_unlocked" not in st.session_state:
+    st.session_state.app_unlocked = False
+
+def check_master_password():
+    """Verifica a senha mestra antes de carregar o app."""
+    if st.session_state.app_unlocked:
+        return
+
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    coluna_esq, coluna_centro, coluna_dir = st.columns([1, 1, 1])
+    with coluna_centro:
+        st.markdown("<h3 style='text-align: center;'>🔒 Acesso Restrito</h3>", unsafe_allow_html=True)
+        senha_digitada = st.text_input("Senha do Sistema", type="password", key="master_pwd")
+        
+        if st.button("Liberar Acesso", use_container_width=True):
+            try:
+                # Verifica no Secrets
+                if senha_digitada == st.secrets["security"]["MASTER_PASSWORD"]:
+                    st.session_state.app_unlocked = True
+                    st.rerun()
+                else:
+                    st.error("Senha incorreta.")
+            except:
+                st.error("Erro: Configure [security] MASTER_PASSWORD no Secrets.")
+    
+    # PARA A EXECUÇÃO AQUI SE NÃO ESTIVER DESBLOQUEADO
+    st.stop()
+
+# Executa o bloqueio
+check_master_password()
+
+# ESTILOS CSS (ORIGINAIS RESTAURADOS - SEM ABREVIAÇÕES)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background-color: #0f1116; }
     section[data-testid="stSidebar"] { background-color: #161b22; border-right: 1px solid #30363d; }
-    .top-bar { background-color: #1f2937; padding: 1rem 1.5rem; border-radius: 12px; border: 1px solid #374151; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    .service-header { color: #e5e7eb; font-size: 1.2rem; font-weight: 700; margin-top: 25px; margin-bottom: 15px; border-left: 5px solid #6366f1; padding-left: 15px; background-color: #1f2937; padding-top: 5px; padding-bottom: 5px; border-radius: 0 8px 8px 0; }
-    .kpi-card { background: linear-gradient(145deg, #1f2937, #111827); border: 1px solid #374151; border-radius: 12px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); min-height: 110px; margin-bottom: 10px; }
+    
+    /* Top Bar */
+    .top-bar {
+        background-color: #1f2937; padding: 1rem 1.5rem; border-radius: 12px;
+        border: 1px solid #374151; display: flex; justify-content: space-between;
+        align-items: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    
+    /* Headers dos Serviços */
+    .service-header {
+        color: #e5e7eb; font-size: 1.2rem; font-weight: 700; margin-top: 25px; margin-bottom: 15px;
+        border-left: 5px solid #6366f1; padding-left: 15px; background-color: #1f2937;
+        padding-top: 5px; padding-bottom: 5px; border-radius: 0 8px 8px 0;
+    }
+    
+    /* Cards KPI (Visual Original Restaurado) */
+    .kpi-card {
+        background: linear-gradient(145deg, #1f2937, #111827); 
+        border: 1px solid #374151; 
+        border-radius: 12px; 
+        padding: 15px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        min-height: 110px;
+        margin-bottom: 10px;
+    }
     .kpi-title { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
     .kpi-value { font-size: 1.4rem; color: #f3f4f6; font-weight: 700; }
     .kpi-sub { font-size: 0.7rem; color: #6b7280; margin-top: 4px; }
+
+    /* Pódio e MVP */
     .podium-card { background: linear-gradient(145deg, #1f2937, #111827); border: 1px solid #374151; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 10px; }
     .podium-pos { font-size: 2rem; margin-bottom: 5px; }
     .podium-name { font-weight: 700; color: #f3f4f6; font-size: 1.1rem; }
     .podium-val { color: #9ca3af; font-size: 0.9rem; margin-top: 5px; }
     .mvp-card { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border-radius: 15px; padding: 20px; text-align: center; color: white; box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4); margin-bottom: 25px; border: 1px solid #818cf8; }
+    
+    /* Tempo Real */
     .realtime-card { background-color: #1f2937; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #374151; display: flex; align-items: center; justify-content: space-between; }
+    
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; border-bottom: 1px solid #374151; margin-bottom: 20px; }
     .stTabs [data-baseweb="tab"] { height: 60px; white-space: pre-wrap; background-color: transparent; border: none; color: #9ca3af; font-size: 1.1rem; font-weight: 600; padding: 0 20px; }
     .stTabs [data-baseweb="tab"]:hover { color: #e5e7eb; background-color: #1f2937; border-radius: 8px 8px 0 0; }
@@ -44,101 +104,112 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 🔒 BLOQUEIO DE SEGURANÇA
-if "app_unlocked" not in st.session_state:
-    st.session_state.app_unlocked = False
-
-def check_master_password():
-    if st.session_state.app_unlocked: return
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c2:
-        st.markdown("<h3 style='text-align: center;'>🔒 Acesso Restrito</h3>", unsafe_allow_html=True)
-        pwd = st.text_input("Senha do Sistema", type="password", key="master_pwd")
-        if st.button("Liberar Acesso", use_container_width=True):
-            try:
-                if pwd == st.secrets["security"]["MASTER_PASSWORD"]:
-                    st.session_state.app_unlocked = True
-                    st.rerun()
-                else: st.error("Senha incorreta.")
-            except: st.error("Erro: Configure [security] MASTER_PASSWORD no Secrets.")
-    st.stop()
-
-check_master_password()
-
-# CREDENCIAIS
+# ------------------------------------------------------------------------------
+# CREDENCIAIS VIA SECRETS (SEGURANÇA ATIVADA)
+# ------------------------------------------------------------------------------
 try:
     BASE_URL = st.secrets["api"]["BASE_URL"]
     ADMIN_USER = st.secrets["api"]["ADMIN_USER"]
     ADMIN_PASS = st.secrets["api"]["ADMIN_PASS"]
     ID_CONTA = st.secrets["api"]["ID_CONTA"]
+    
     SUPERVISOR_LOGIN = st.secrets["auth"]["SUPERVISOR_LOGIN"]
     SUPERVISOR_PASS = st.secrets["auth"]["SUPERVISOR_PASS"]
+    
+    # Credenciais Supervisors
     SUPERVISOR_CANCELAMENTO_LOGIN = st.secrets["auth"].get("SUPERVISOR_CANCELAMENTO_LOGIN", "admin_cancel")
     SUPERVISOR_CANCELAMENTO_PASS = st.secrets["auth"].get("SUPERVISOR_CANCELAMENTO_PASS", "senha_cancel")
+    
     SUPERVISOR_SUPORTE_LOGIN = st.secrets["auth"].get("SUPERVISOR_SUPORTE_LOGIN", "admin_sup")
     SUPERVISOR_SUPORTE_PASS = st.secrets["auth"].get("SUPERVISOR_SUPORTE_PASS", "senha_sup")
-    SUPERVISOR_NEGOCIACAO_LOGIN = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_LOGIN", "admin_neg")
-    SUPERVISOR_NEGOCIACAO_PASS = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_PASS", "senha_neg")
+    
     PESQUISAS_IDS = st.secrets["ids"]["PESQUISAS_IDS"]
     IDS_PERGUNTAS_VALIDAS = st.secrets["ids"]["IDS_PERGUNTAS_VALIDAS"]
-except Exception as e:
-    st.error(f"Erro Secrets: {e}")
+except Exception as erro:
+    st.error(f"⚠️ Erro crítico: Não foi possível carregar os Segredos (Secrets). Verifique a configuração no Streamlit Cloud. Detalhe: {erro}")
     st.stop()
 
-# CONSTANTES
+# Filtros Técnicos Fixos
 CANAIS_ALVO = ['appchat', 'chat', 'botmessenger', 'instagram', 'whatsapp']
+
+# SERVIÇOS MONITORADOS (ORIGINAL NRC)
 SERVICOS_ALVO = ['COMERCIAL', 'FINANCEIRO', 'NOVOS CLIENTES', 'LIBERAÇÃO']
-LISTA_NRC = ['RILDYVAN', 'MILENA', 'ALVES', 'MONICKE', 'AYLA', 'MARIANY', 'EDUARDA', 'MENEZES', 'JUCIENNY', 'MARIA', 'ANDREZA', 'LUZILENE', 'IGO', 'AIDA', 'Caribé', 'Michelly', 'ADRIA', 'ERICA', 'HENRIQUE', 'SHYRLEI', 'ANNA', 'JULIA', 'FERNANDES']
+
+# LISTA NRC (OFICIAL - ORIGINAL)
+LISTA_NRC = [
+    'RILDYVAN', 'MILENA', 'ALVES', 'MONICKE', 'AYLA', 'MARIANY', 'EDUARDA', 
+    'MENEZES', 'JUCIENNY', 'MARIA', 'ANDREZA', 'LUZILENE', 'IGO', 'AIDA', 
+    'Caribé', 'Michelly', 'ADRIA', 'ERICA', 'HENRIQUE', 'SHYRLEI', 
+    'ANNA', 'JULIA', 'FERNANDES'
+]
 NOMES_COMUNS_PRIMEIRO = ['MARIA', 'ANNA', 'JULIA', 'ERICA']
 
+# ==============================================================================
+# 1.1 CONFIGURAÇÃO DE NOVOS SETORES (ADICIONADO - NÃO ALTERA O ORIGINAL)
+# ==============================================================================
 SETORES_AGENTES = {
     "NRC": LISTA_NRC, 
     "CANCELAMENTO": ['BARBOSA', 'ELOISA', 'LARISSA', 'EDUARDO', 'CAMILA', 'SAMARA'],
     "NEGOCIACAO": ['Carla', 'Lenk', 'Ana Luiza', 'JULIETTI', 'RODRIGO', 'Monalisa', 'Ramom', 'Ednael', 'Leticia', 'Rita', 'Mariana', 'Flavia s', 'Uri', 'Clara', 'Wanderson', 'Aparecida', 'Cristina', 'Caio', 'LUKAS'],
     "SUPORTE": ['VALERIO', 'TARCISIO', 'GRANJA', 'ALICE', 'FERNANDO', 'SANTOS', 'RENAN', 'FERREIRA', 'HUEMILLY', 'LOPES', 'LAUDEMILSON', 'RAYANE', 'LAYS', 'JORGE', 'LIGIA', 'ALESSANDRO', 'GEIBSON', 'ROBERTO', 'OLIVEIRA', 'MAURÍCIO', 'AVOLO', 'CLEBER', 'ROMERIO', 'JUNIOR', 'ISABELA', 'RENAN', 'WAGNER', 'CLAUDIA', 'ANTONIO', 'JOSE', 'LEONARDO', 'KLEBSON', 'OZENAIDE']
 }
+
 SETORES_SERVICOS = {
     "NRC": SERVICOS_ALVO,
     "CANCELAMENTO": ['CANCELAMENTO'], 
-    "NEGOCIACAO": ['NEGOCIAÇÃO ATIVA', 'NEGOCIAÇÃO  PASSIVA', 'CLINTES CORPORATIVOS-LINK DEDICADO', 'CLIENTES CORPORATIVOS-LINK DEDICADO'], 
-    "SUPORTE": ['SUPORTE', 'LIBERAÇÃO']
+    "NEGOCIACAO": ['NEGOCIACAO', 'RENEGOCIACAO'],
+    "SUPORTE": ['SUPORTE', 'LIBERAÇÃO'] # Filtra apenas esses dois serviços no painel geral
 }
+
+# Configurações Especiais Suporte
 LISTA_PLANTAO = ['TARCISIO', 'GEIBSON', 'LEONARDO', 'FERNANDO', 'RENAN']
 ID_CONTA_CLIENTE_INTERNO = "5"
-CONTAS_NEGOCIACAO = ["1", "14"]
+
+# REGRAS DE PAUSA
 LIMITES_PAUSA = { "CURTA": 15.0, "LONGA": 120.0 }
 TOLERANCIA_MENSAL_EXCESSO = 20.0 
 TOLERANCIA_VISUAL_ALMOCO = 2.0
 
 # ==============================================================================
-# 2. FUNÇÕES AUXILIARES E CONEXÃO
+# 2. CONEXÃO GOOGLE SHEETS (BANCO DE DADOS)
 # ==============================================================================
-
 def conectar_gsheets():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open("solicitacoes_nrc").sheet1
-    except: return None
+        sheet = client.open("solicitacoes_nrc").sheet1
+        return sheet
+    except Exception as erro:
+        return None
 
-def salvar_solicitacao_gsheets(nome, id_agente, motivo, msg):
+def salvar_solicitacao_gsheets(nome_agente, id_agente, motivo, mensagem):
     sheet = conectar_gsheets()
     if sheet:
+        data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         try:
-            sheet.append_row([datetime.now().strftime("%d/%m/%Y %H:%M:%S"), id_agente, nome, motivo, msg])
-            return True, "Salvo com sucesso!"
-        except Exception as e: return False, str(e)
-    return False, "Erro conexão"
+            # Adiciona linha: Data, ID, Nome, Motivo, Mensagem
+            sheet.append_row([data_hora, id_agente, nome_agente, motivo, mensagem])
+            return True, "Solicitação salva na nuvem com sucesso!"
+        except Exception as erro:
+            return False, f"Erro ao escrever na planilha: {erro}"
+    else:
+        return False, "Erro de conexão com Google Sheets. Verifique o compartilhamento."
 
 def ler_solicitacoes_gsheets():
     sheet = conectar_gsheets()
     if sheet:
-        try: return pd.DataFrame(sheet.get_all_records())
-        except: return pd.DataFrame()
+        try:
+            data = sheet.get_all_records()
+            return pd.DataFrame(data)
+        except:
+            return pd.DataFrame()
     return pd.DataFrame()
+
+# ==============================================================================
+# 3. FUNÇÕES DE BACKEND (MATRIX API)
+# ==============================================================================
 
 @st.cache_data(ttl=600)
 def get_admin_token():
@@ -148,19 +219,24 @@ def get_admin_token():
     except: pass
     return None
 
-def validar_agente_api(token, user_input):
+def validar_agente_api(token, email_input):
+    url = f"{BASE_URL}/agentes"
+    headers = {"Authorization": f"Bearer {token}"}
+    input_limpo = email_input.strip().lower()
     try:
-        r = requests.get(f"{BASE_URL}/agentes", headers={"Authorization": f"Bearer {token}"}, params={"login": user_input.strip().lower()}, timeout=5)
+        r = requests.get(url, headers=headers, params={"login": input_limpo}, timeout=5)
         if r.status_code == 200:
-            res = r.json().get("result", [])
-            if res: return {"id": str(res[0].get("cod_agente")), "nome": res[0].get("nome_exibicao") or res[0].get("agente"), "email": res[0].get("email","").lower()}
+            result = r.json().get("result", [])
+            if result:
+                agente = result[0]
+                return { "id": str(agente.get("cod_agente")), "nome": agente.get("nome_exibicao") or agente.get("agente"), "email": agente.get("email", "").lower() }
     except: pass
     return None
 
-def time_str_to_seconds(t_str):
-    if not t_str or not isinstance(t_str, str): return 0
+def time_str_to_seconds(tempo_str):
+    if not tempo_str or not isinstance(tempo_str, str): return 0
     try:
-        parts = list(map(int, t_str.split(':')))
+        parts = list(map(int, tempo_str.split(':')))
         if len(parts) == 3: return parts[0]*3600 + parts[1]*60 + parts[2]
     except: pass
     return 0
@@ -171,885 +247,1066 @@ def seconds_to_hms(seconds):
     h, m = divmod(m, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def formatar_tempo_humano(minutos):
-    if not minutos: return "0m"
-    h, m = divmod(int(minutos), 60)
-    return f"{h}h {m:02d}m" if h > 0 else f"{m}m"
+def formatar_tempo_humano(minutos_float):
+    """Converte minutos (float) em string legível (ex: 2h 05m)."""
+    if not minutos_float: return "0m"
+    minutos_int = int(minutos_float)
+    horas, mins = divmod(minutos_int, 60)
+    if horas > 0: return f"{horas}h {mins:02d}m"
+    else: return f"{mins}m"
 
 @st.cache_data(ttl=3600)
 def buscar_ids_canais(token):
+    url = f"{BASE_URL}/canais"
+    headers = {"Authorization": f"Bearer {token}"}
     ids = []
     try:
-        r = requests.get(f"{BASE_URL}/canais", headers={"Authorization": f"Bearer {token}"})
+        r = requests.get(url, headers=headers)
         if r.status_code == 200:
             for c in r.json():
-                if any(alvo in str(c.get("canal","")).lower() for alvo in CANAIS_ALVO): ids.append(str(c.get("id_canal")))
+                if any(alvo in str(c.get("canal", "")).lower() for alvo in CANAIS_ALVO): ids.append(str(c.get("id_canal")))
     except: pass
     return ids
 
-@st.cache_data(ttl=600)
-def mapear_todos_agentes(token):
+# ==============================================================================
+# 4. FUNÇÕES ESPECÍFICAS DO AGENTE
+# ==============================================================================
+
+@st.cache_data(ttl=60)
+def buscar_historico_login(token, id_agente, data_ini, data_fim):
+    url = f"{BASE_URL}/relAgenteLogin"
     headers = {"Authorization": f"Bearer {token}"}
-    mapa = {}
+    logins_por_dia = {}
     page = 1
-    # Adicionando visual de carregamento para não parecer que travou
-    status = st.empty()
-    while True:
-        status.caption(f"Carregando base de agentes... Página {page}")
+    while page <= 3: 
+        params = {"data_inicial": data_ini.strftime("%Y-%m-%d"), "data_final": data_fim.strftime("%Y-%m-%d"), "agente": id_agente, "page": page, "limit": 100}
         try:
-            r = requests.get(f"{BASE_URL}/agentes", headers=headers, params={"limit": 100, "page": page, "bol_cancelado": 0}, timeout=10)
+            r = requests.get(url, headers=headers, params=params, timeout=10)
+            if r.status_code != 200: break
+            rows = r.json().get("rows", [])
+            if not rows: break
+            for row in rows:
+                data_str = row.get("data_login")
+                if data_str:
+                    dt_obj = datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S")
+                    dia_str = dt_obj.strftime("%Y-%m-%d")
+                    if dia_str not in logins_por_dia: logins_por_dia[dia_str] = dt_obj
+                    else:
+                        if dt_obj < logins_por_dia[dia_str]: logins_por_dia[dia_str] = dt_obj
+            if len(rows) < 100: break
+            page += 1
+        except: break
+    if not logins_por_dia: return None, "Sem Login", pd.DataFrame()
+    lista_dados = []
+    for dia in sorted(logins_por_dia.keys(), reverse=True):
+        dt = logins_por_dia[dia]
+        lista_dados.append({"Data": dt.strftime("%d/%m/%Y"), "Primeira Entrada": dt.strftime("%H:%M:%S"), "Dia da Semana": dt.strftime("%A")})
+    dt_recente = logins_por_dia[sorted(logins_por_dia.keys(), reverse=True)[0]]
+    return dt_recente, dt_recente.strftime("%H:%M"), pd.DataFrame(lista_dados)
+
+@st.cache_data(ttl=300)
+def buscar_estatisticas_agente(token, id_agente, data_ini, data_fim):
+    url = f"{BASE_URL}/relAtEstatistico"
+    headers = {"Authorization": f"Bearer {token}"}
+    ids_canais = buscar_ids_canais(token)
+    params = {"data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00", "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59", "agrupador": "agente", "agente[]": [id_agente], "canal[]": ids_canais, "id_conta": ID_CONTA}
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=15)
+        if r.status_code == 200:
+            dados = r.json()
+            if dados and isinstance(dados, list): return dados[0] 
+    except: pass
+    return None
+
+@st.cache_data(ttl=600)
+def buscar_csat_nrc(token, id_agente, data_ini, data_fim):
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{BASE_URL}/RelPesqAnalitico"
+    todas_respostas = []
+    filtro_agentes = [id_agente] if id_agente else []
+    for p_id in PESQUISAS_IDS:
+        page = 1
+        while True:
+            params = {"data_inicial": data_ini.strftime("%Y-%m-%d"), "data_final": data_fim.strftime("%Y-%m-%d"), "pesquisa": p_id, "id_conta": ID_CONTA, "limit": 1000, "page": page}
+            if filtro_agentes: params["agente[]"] = filtro_agentes
+            try:
+                r = requests.get(url, headers=headers, params=params, timeout=30)
+                if r.status_code != 200: break
+                data = r.json()
+                if not data or not isinstance(data, list): break
+                total_respostas_api = 0
+                encontrou_valida = False
+                for bloco in data:
+                    id_perg = str(bloco.get("id_pergunta", ""))
+                    if id_perg not in IDS_PERGUNTAS_VALIDAS: continue
+                    encontrou_valida = True
+                    sintetico = bloco.get("sintetico", [])
+                    if sintetico:
+                        for item in sintetico: total_respostas_api += int(item.get("num_quantidade", 0))
+                    respostas = bloco.get("respostas", [])
+                    for resp in respostas:
+                        todas_respostas.append({"Nota": resp.get("nom_valor"), "Comentario": resp.get("nom_resposta"), "Data": resp.get("dat_resposta"), "Cliente": resp.get("nom_contato"), "Protocolo": resp.get("num_protocolo")})
+                if encontrou_valida:
+                    if (page * 1000) >= total_respostas_api: break
+                if len(data) < 2 and not encontrou_valida: break
+                page += 1
+            except: break
+    df = pd.DataFrame(todas_respostas)
+    score_final = 0.0
+    total_pesquisas = 0
+    if not df.empty:
+        df['Nota_Num'] = pd.to_numeric(df['Nota'], errors='coerce').fillna(0).astype(int)
+        total_pesquisas = len(df)
+        if total_pesquisas > 0:
+            positivas = len(df[df['Nota_Num'] >= 8])
+            score_final = (positivas / total_pesquisas) * 100
+    return score_final, total_pesquisas, df
+
+@st.cache_data(ttl=300)
+def buscar_pausas_detalhado(token, id_agente, data_ini, data_fim):
+    url = f"{BASE_URL}/relAgentePausa"
+    headers = {"Authorization": f"Bearer {token}"}
+    todas_pausas = []
+    page = 1
+    while True:
+        params = {"dat_inicial": data_ini.strftime("%Y-%m-%d"), "dat_final": data_fim.strftime("%Y-%m-%d"), "cod_agente": id_agente, "limit": 100, "pagina": page}
+        try:
+            r = requests.get(url, headers=headers, params=params, timeout=10)
+            if r.status_code != 200: break
+            data = r.json()
+            rows = data.get("rows", [])
+            if not rows: break
+            todas_pausas.extend(rows)
+            if len(rows) < 100: break
+            page += 1
+        except: break
+    return pd.DataFrame(todas_pausas)
+
+def gerar_link_protocolo(protocolo):
+    if not protocolo: return None
+    s_proto = str(protocolo).strip()
+    if len(s_proto) < 7: suffix = s_proto
+    else: suffix = s_proto[-7:]
+    return f"https://ateltelecom.matrixdobrasil.ai/atendimento/view/cod_atendimento/{suffix}/readonly/true#atendimento-div"
+
+# ==============================================================================
+# 5. FUNÇÕES DO SUPERVISOR (VERSÃO GOLD 9.0)
+# ==============================================================================
+
+def buscar_agentes_online_filtrado_nrc(token):
+    """Busca agentes online e filtra apenas os do NRC."""
+    headers = {"Authorization": f"Bearer {token}"}
+    agentes_online_nrc = []
+    
+    nrc_upper = [x.strip().upper() for x in LISTA_NRC]
+    
+    try:
+        r = requests.get(f"{BASE_URL}/agentesOnline", headers=headers)
+        if r.status_code == 200:
+            todos_online = r.json()
+            for agente in todos_online:
+                nome_full = str(agente.get("nom_agente", "")).strip().upper()
+                partes_nome = nome_full.split()
+                if not partes_nome: continue
+                
+                match_encontrado = False
+                for alvo in nrc_upper:
+                    if alvo in NOMES_COMUNS_PRIMEIRO:
+                        if alvo == partes_nome[0]: match_encontrado = True; break
+                    else:
+                        if alvo in partes_nome: match_encontrado = True; break
+                
+                if match_encontrado:
+                    agentes_online_nrc.append(agente)
+    except: pass
+    return agentes_online_nrc
+
+def forcar_logout(token, id_agente):
+    """Executa o logout forçado via API."""
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{BASE_URL}/deslogarAgente"
+    payload = {"id_agente": int(id_agente)}
+    try:
+        r = requests.post(url, headers=headers, json=payload)
+        if r.status_code == 200:
+            return True, "Sucesso"
+        else:
+            return False, f"Erro API: {r.text}"
+    except Exception as e:
+        return False, str(e)
+
+@st.cache_data(ttl=300)
+def buscar_dados_completos_supervisor(token, data_ini, data_fim):
+    headers = {"Authorization": f"Bearer {token}"}
+    ids_agentes = []
+    mapa_agentes = {}
+    nrc_upper = [x.strip().upper() for x in LISTA_NRC]
+    
+    # 1. Mapeamento de Agentes
+    pagina = 1
+    while True:
+        try:
+            r = requests.get(f"{BASE_URL}/agentes", headers=headers, params={"limit": 100, "page": pagina, "bol_cancelado": 0})
             if r.status_code != 200: break
             data = r.json()
             rows = data.get("result", [])
             if not rows: break
-            for row in rows:
-                nome = str(row.get("nome_exibicao") or row.get("agente")).strip().upper()
-                cod = str(row.get("cod_agente"))
-                mapa[nome] = cod
-                primeiro = nome.split()[0]
-                if primeiro not in mapa: mapa[primeiro] = cod
-            if len(rows) < 100: break
-            page += 1
+            for agente in rows:
+                nome_raw = str(agente.get("nome_exibicao") or agente.get("agente")).strip()
+                nome_upper = nome_raw.upper() 
+                partes_nome = nome_upper.split()
+                if not partes_nome: continue
+                match_encontrado = False
+                for alvo in nrc_upper:
+                    if alvo in NOMES_COMUNS_PRIMEIRO:
+                        if alvo == partes_nome[0]: match_encontrado = True; break
+                    else:
+                        if alvo in partes_nome: match_encontrado = True; break
+                if match_encontrado: 
+                    cod = str(agente.get("cod_agente"))
+                    ids_agentes.append(cod)
+                    mapa_agentes[cod] = nome_upper
+            if pagina * 100 >= data.get("total", 0): break
+            pagina += 1
         except: break
-    status.empty()
-    return mapa
 
-# ==============================================================================
-# 3. FUNÇÕES ESPECÍFICAS AGENTE
-# ==============================================================================
-
-@st.cache_data(ttl=60)
-def buscar_historico_login(token, id_agente, d_ini, d_fim):
-    headers = {"Authorization": f"Bearer {token}"}
-    logins = []
-    page = 1
-    while page <= 3:
-        try:
-            r = requests.get(f"{BASE_URL}/relAgenteLogin", headers=headers, params={"data_inicial": d_ini.strftime("%Y-%m-%d"), "data_final": d_fim.strftime("%Y-%m-%d"), "agente": id_agente, "page": page, "limit": 100}, timeout=10)
-            if r.status_code != 200: break
-            rows = r.json().get("rows", [])
-            if not rows: break
-            logins.extend(rows)
-            if len(rows) < 100: break
-            page += 1
-        except: break
+    ids_canais = buscar_ids_canais(token)
     
-    df = pd.DataFrame(logins)
-    txt_prim = "Sem Login"
-    dt_prim = None
-    if not df.empty:
-        # Pega o primeiro registro do dia mais recente
-        datas = []
-        for x in logins:
-            if x.get("data_login"):
-                datas.append(datetime.strptime(x["data_login"], "%Y-%m-%d %H:%M:%S"))
-        if datas:
-            datas.sort(reverse=True)
-            dt_prim = datas[0]
-            txt_prim = dt_prim.strftime("%H:%M")
-    return dt_prim, txt_prim, df
+    # Estrutura expandida para os 6 cards
+    resultados = {
+        s: {
+            "num_qtd": 0, 
+            "tma": "--:--", 
+            "tme": "--:--", 
+            "tmia": "--:--", 
+            "tmic": "--:--", 
+            "csat_pos": 0, 
+            "csat_total": 0
+        } 
+        for s in SERVICOS_ALVO
+    }
 
-@st.cache_data(ttl=300)
-def buscar_estatisticas_agente(token, id_agente, d_ini, d_fim):
-    ids_can = buscar_ids_canais(token)
+    if not ids_agentes: return resultados, 0.0, 0, mapa_agentes, dados_globais
+    
+    # 2. Dados Globais NRC (Estatísticas Agrupadas por Conta filtradas pelos Agentes NRC)
+    # Importante: Como queremos os totais dos agentes do NRC, podemos usar o agrupador 'conta'
+    # mas filtrando pelos IDs dos agentes. A API deve retornar o somatório.
+    dados_globais = {"tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--"}
+    
     try:
-        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers={"Authorization": f"Bearer {token}"}, 
-                         params={"data_inicial": f"{d_ini.strftime('%Y-%m-%d')} 00:00:00", "data_final": f"{d_fim.strftime('%Y-%m-%d')} 23:59:59", "agrupador": "agente", "agente[]": [id_agente], "canal[]": ids_can, "id_conta": ID_CONTA})
-        if r.status_code == 200:
-            l = r.json()
-            if l: return l[0]
+        params_globais = {
+            "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+            "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+            "agrupador": "conta", 
+            "agente[]": ids_agentes,
+            "canal[]": ids_canais,
+            "id_conta": ID_CONTA
+        }
+        r_global = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params_globais)
+        if r_global.status_code == 200:
+            lista_global = r_global.json()
+            if lista_global and isinstance(lista_global, list):
+                item_global = lista_global[0]
+                dados_globais["tma"] = item_global.get("tma", "--:--")
+                dados_globais["tme"] = item_global.get("tme", "--:--")
+                dados_globais["tmia"] = item_global.get("tmia", "--:--")
+                dados_globais["tmic"] = item_global.get("tmic", "--:--")
     except: pass
-    return {}
 
-@st.cache_data(ttl=600)
-def buscar_csat_nrc(token, id_agente, d_ini, d_fim):
-    headers = {"Authorization": f"Bearer {token}"}
-    respostas = []
-    for pid in PESQUISAS_IDS:
-        pg = 1
+    # 3. Estatísticas (Por Serviço)
+    for servico in SERVICOS_ALVO:
+        params = {
+            "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+            "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+            "agrupador": "servico",
+            "agente[]": ids_agentes,
+            "canal[]": ids_canais,
+            "id_conta": ID_CONTA,
+            "servico": servico
+        }
+        try:
+            r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params)
+            if r.status_code == 200:
+                lista = r.json()
+                if lista and isinstance(lista, list):
+                    item = lista[0]
+                    qtd_bruta = int(item.get("num_qtd", 0))
+                    qtd_aband = int(item.get("num_qtd_abandonado", 0))
+                    resultados[servico]["num_qtd"] = qtd_bruta - qtd_aband
+                    resultados[servico]["tma"] = item.get("tma", "--:--")
+                    resultados[servico]["tme"] = item.get("tme", "--:--")
+                    resultados[servico]["tmia"] = item.get("tmia", "--:--")
+                    resultados[servico]["tmic"] = item.get("tmic", "--:--")
+        except: pass
+
+    # 4. Satisfação (CSAT)
+    csat_geral_pos = 0; csat_geral_total = 0
+    for p_id in PESQUISAS_IDS:
+        p_page = 1
         while True:
+            p_params = {
+                "data_inicial": data_ini.strftime("%Y-%m-%d"), 
+                "data_final": data_fim.strftime("%Y-%m-%d"), 
+                "pesquisa": p_id, "id_conta": ID_CONTA, "limit": 1000, 
+                "page": p_page, "agente[]": ids_agentes
+            }
             try:
-                r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params={"data_inicial": d_ini.strftime("%Y-%m-%d"), "data_final": d_fim.strftime("%Y-%m-%d"), "pesquisa": pid, "id_conta": ID_CONTA, "limit": 1000, "page": pg, "agente[]": [id_agente]})
+                r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=p_params)
                 if r.status_code != 200: break
                 data = r.json()
                 if not data or not isinstance(data, list): break
                 total_api = 0
-                for b in data:
-                    if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
-                        total_api += sum(int(x.get("num_quantidade", 0)) for x in b["sintetico"])
-                        for rsp in b.get("respostas", []):
-                            respostas.append({"Nota": rsp.get("nom_valor"), "Comentario": rsp.get("nom_resposta"), "Data": rsp.get("dat_resposta"), "Cliente": rsp.get("nom_contato"), "Protocolo": rsp.get("num_protocolo")})
-                if pg * 1000 >= total_api: break
+                for bloco in data:
+                    if str(bloco.get("id_pergunta", "")) in IDS_PERGUNTAS_VALIDAS:
+                        if bloco.get("sintetico"): total_api += sum(int(x.get("num_quantidade", 0)) for x in bloco["sintetico"])
+                        for resp in bloco.get("respostas", []):
+                            try:
+                                servico_resp = str(resp.get("nom_servico", "")).upper().strip()
+                                val_raw = resp.get("nom_valor")
+                                if val_raw and val_raw != "": nota = int(float(val_raw))
+                                else: nota = -1
+                                
+                                if nota >= 0: 
+                                    csat_geral_total += 1
+                                    if nota >= 8: csat_geral_pos += 1
+                                    if servico_resp in SERVICOS_ALVO:
+                                        resultados[servico_resp]["csat_total"] += 1
+                                        if nota >= 8: resultados[servico_resp]["csat_pos"] += 1
+                            except: pass
+                if (p_page * 1000) >= total_api: break
                 if len(data) < 2: break
-                pg += 1
+                p_page += 1
             except: break
-    df = pd.DataFrame(respostas)
-    score = 0.0
-    if not df.empty:
-        # CORREÇÃO KEY ERROR: Garantindo a coluna Nota_Num
-        df['Nota_Num'] = pd.to_numeric(df['Nota'], errors='coerce').fillna(0).astype(int)
-        tot = len(df)
-        if tot > 0: score = (len(df[df['Nota_Num'] >= 8]) / tot) * 100
-    else:
-        df['Nota_Num'] = 0 # Garante a coluna se vazio
-        
-    return score, len(df), df
 
-@st.cache_data(ttl=300)
-def buscar_pausas_detalhado(token, id_agente, d_ini, d_fim):
-    pausas = []
-    pg = 1
+    score_geral = (csat_geral_pos / csat_geral_total * 100) if csat_geral_total > 0 else 0.0
+    return resultados, score_geral, csat_geral_total, mapa_agentes, dados_globais
+
+def _processar_agente_pausas(token, cod_agente, nome_agente, data_ini, data_fim):
+    headers = {"Authorization": f"Bearer {token}"}
+    local_curtas, local_almoco, local_logins, local_ranking = [], [], [], []
+    
+    # 1. PAUSAS
+    pausas_agente = []
+    pagina = 1
     while True:
+        if pagina > 5: break
+        params = {"dat_inicial": data_ini.strftime("%Y-%m-%d"), "dat_final": data_fim.strftime("%Y-%m-%d"), "cod_agente": cod_agente, "limit": 100, "pagina": pagina}
         try:
-            r = requests.get(f"{BASE_URL}/relAgentePausa", headers={"Authorization": f"Bearer {token}"}, params={"dat_inicial": d_ini.strftime("%Y-%m-%d"), "dat_final": d_fim.strftime("%Y-%m-%d"), "cod_agente": id_agente, "limit": 100, "pagina": pg})
+            r = requests.get(f"{BASE_URL}/relAgentePausa", headers=headers, params=params, timeout=10)
             if r.status_code != 200: break
             rows = r.json().get("rows", [])
             if not rows: break
-            pausas.extend(rows)
-            pg += 1
+            pausas_agente.extend(rows)
+            pagina += 1
         except: break
-    return pd.DataFrame(pausas)
-
-def gerar_link_protocolo(protocolo):
-    if not protocolo: return None
-    s = str(protocolo).strip()
-    return f"https://ateltelecom.matrixdobrasil.ai/atendimento/view/cod_atendimento/{s[-7:] if len(s)>7 else s}/readonly/true#atendimento-div"
-
-# ==============================================================================
-# 4. FUNÇÕES GERAIS SUPERVISOR
-# ==============================================================================
-
-def buscar_agentes_online_filtrado_setor(token, setor_nome):
-    headers = {"Authorization": f"Bearer {token}"}
-    on_filtrados = []
-    nomes_alvo = [x.strip().upper() for x in SETORES_AGENTES.get(setor_nome, [])]
-    try:
-        r = requests.get(f"{BASE_URL}/agentesOnline", headers=headers)
-        if r.status_code == 200:
-            for ag in r.json():
-                nm = str(ag.get("nom_agente","")).strip().upper()
-                parts = nm.split()
-                if not parts: continue
-                match = False
-                for alvo in nomes_alvo:
-                    if alvo in parts: match=True; break
-                    if alvo in NOMES_COMUNS_PRIMEIRO and alvo == parts[0]: match=True; break
-                if match: on_filtrados.append(ag)
-    except: pass
-    return on_filtrados
-
-def buscar_agentes_online_filtrado_nrc(token):
-    return buscar_agentes_online_filtrado_setor(token, "NRC")
-
-def forcar_logout(token, id_agente):
-    try:
-        r = requests.post(f"{BASE_URL}/deslogarAgente", headers={"Authorization": f"Bearer {token}"}, json={"id_agente": int(id_agente)})
-        if r.status_code == 200: return True, "Sucesso"
-        return False, r.text
-    except Exception as e: return False, str(e)
-
-# ==============================================================================
-# 5. DADOS ESTATÍSTICOS MULTISETOR
-# ==============================================================================
-
-@st.cache_data(ttl=300)
-def buscar_dados_completos_supervisor(token, d_ini, d_fim):
-    return buscar_dados_supervisor_multisetor(token, d_ini, d_fim, "NRC")
-
-@st.cache_data(ttl=300)
-def buscar_dados_supervisor_multisetor(token, d_ini, d_fim, setor_nome):
-    headers = {"Authorization": f"Bearer {token}"}
-    ids_agentes = []
-    mapa_agentes = {}
     
-    # Mapeamento
-    mapa_full = mapear_todos_agentes(token)
-    nomes_alvo = [x.strip().upper() for x in SETORES_AGENTES.get(setor_nome, [])]
+    acumulado_excesso_curta = 0.0
     
-    for nome in nomes_alvo:
-        if nome in mapa_full:
-            cid = mapa_full[nome]
-            if cid not in ids_agentes: ids_agentes.append(cid); mapa_agentes[cid] = nome
-        else:
-            for real_n, c in mapa_full.items():
-                if nome in real_n.split():
-                    if nome in NOMES_COMUNS_PRIMEIRO:
-                        if nome == real_n.split()[0]: ids_agentes.append(c); mapa_agentes[c] = real_n; break
-                    else:
-                         ids_agentes.append(c); mapa_agentes[c] = real_n; break
-    
-    ids_canais = buscar_ids_canais(token)
-    servicos = SETORES_SERVICOS.get(setor_nome, [])
-    resultados = {s: {"num_qtd": 0, "tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--", "csat_pos": 0, "csat_total": 0} for s in servicos}
-    
-    if not ids_agentes: return resultados, 0.0, 0, mapa_agentes, {"tma":"--","tme":"--","tmia":"--","tmic":"--"}
-
-    # Globais
-    dados_g = {"tma": "--", "tme": "--", "tmia": "--", "tmic": "--"}
-    try:
-        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params={"data_inicial": f"{d_ini.strftime('%Y-%m-%d')} 00:00:00", "data_final": f"{d_fim.strftime('%Y-%m-%d')} 23:59:59", "agrupador": "conta", "agente[]": ids_agentes, "canal[]": ids_canais, "id_conta": ID_CONTA})
-        if r.status_code == 200:
-            l = r.json()
-            if l: dados_g = l[0]
-    except: pass
-
-    # Por Serviço
-    for s in servicos:
-        try:
-            r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params={"data_inicial": f"{d_ini.strftime('%Y-%m-%d')} 00:00:00", "data_final": f"{d_fim.strftime('%Y-%m-%d')} 23:59:59", "agrupador": "servico", "agente[]": ids_agentes, "canal[]": ids_canais, "id_conta": ID_CONTA, "servico": s})
-            if r.status_code == 200:
-                l = r.json()
-                if l:
-                    i = l[0]
-                    resultados[s]["num_qtd"] = int(i.get("num_qtd",0)) - int(i.get("num_qtd_abandonado",0))
-                    resultados[s]["tma"] = i.get("tma"); resultados[s]["tme"] = i.get("tme"); resultados[s]["tmia"] = i.get("tmia"); resultados[s]["tmic"] = i.get("tmic")
-        except: pass
-
-    # CSAT
-    pos = 0; tot = 0
-    for pid in PESQUISAS_IDS:
-        pg = 1
-        while True:
-            try:
-                r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params={"data_inicial": d_ini.strftime("%Y-%m-%d"), "data_final": d_fim.strftime("%Y-%m-%d"), "pesquisa": pid, "id_conta": ID_CONTA, "limit": 1000, "page": pg, "agente[]": ids_agentes})
-                if r.status_code != 200: break
-                d = r.json()
-                if not d or not isinstance(d, list): break
-                t_api = 0
-                for b in d:
-                    if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
-                        t_api += sum(int(x.get("num_quantidade", 0)) for x in b["sintetico"])
-                        for rsp in b.get("respostas", []):
-                            s_nm = str(rsp.get("nom_servico", "")).upper().strip()
-                            v = float(rsp.get("nom_valor", -1))
-                            if v >= 0:
-                                tot += 1
-                                if v >= 8: pos += 1
-                                if s_nm in servicos:
-                                    resultados[s_nm]["csat_total"] += 1
-                                    if v >= 8: resultados[s_nm]["csat_pos"] += 1
-                if pg * 1000 >= t_api: break
-                if len(d) < 2: break
-                pg += 1
-            except: break
-            
-    score = (pos/tot*100) if tot > 0 else 0.0
-    return resultados, score, tot, mapa_agentes, dados_g
-
-# ==============================================================================
-# 5.4 NEGOCIAÇÃO (MULTI CONTA)
-# ==============================================================================
-
-def calcular_media_ponderada_tempos(lista):
-    q_t = 0; s_tma=0; s_tme=0; s_tmia=0; s_tmic=0
-    for i in lista:
-        q = i.get('qtd', 0)
-        if q <= 0: continue
-        q_t += q
-        s_tma += time_str_to_seconds(i.get('tma', '00:00:00')) * q
-        s_tme += time_str_to_seconds(i.get('tme', '00:00:00')) * q
-        s_tmia += time_str_to_seconds(i.get('tmia', '00:00:00')) * q
-        s_tmic += time_str_to_seconds(i.get('tmic', '00:00:00')) * q
-    if q_t == 0: return "--:--", "--:--", "--:--", "--:--"
-    return seconds_to_hms(round(s_tma/q_t)), seconds_to_hms(round(s_tme/q_t)), seconds_to_hms(round(s_tmia/q_t)), seconds_to_hms(round(s_tmic/q_t))
-
-@st.cache_data(ttl=300)
-def buscar_dados_negociacao_multiconta(token, d_ini, d_fim):
-    headers = {"Authorization": f"Bearer {token}"}
-    ids_can = buscar_ids_canais(token)
-    servicos = SETORES_SERVICOS["NEGOCIACAO"]
-    res = {s: {"num_qtd": 0, "tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--", "csat_pos": 0, "csat_total": 0} for s in servicos}
-    acum_global = []
-    
-    # Tempos
-    for s in servicos:
-        pond = []
-        vol = 0
-        for c_id in CONTAS_NEGOCIACAO:
-            try:
-                r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params={"data_inicial": f"{d_ini.strftime('%Y-%m-%d')} 00:00:00", "data_final": f"{d_fim.strftime('%Y-%m-%d')} 23:59:59", "agrupador": "servico", "canal[]": ids_can, "id_conta": c_id, "servico": s})
-                if r.status_code == 200:
-                    l = r.json()
-                    if l:
-                        i = l[0]
-                        q = int(i.get("num_qtd", 0)) - int(i.get("num_qtd_abandonado", 0))
-                        if q > 0:
-                            d = {'qtd': q, 'tma': i.get("tma"), 'tme': i.get("tme"), 'tmia': i.get("tmia"), 'tmic': i.get("tmic")}
-                            pond.append(d); acum_global.append(d); vol += q
-            except: pass
-        tma, tme, tmia, tmic = calcular_media_ponderada_tempos(pond)
-        res[s]["num_qtd"] = vol; res[s]["tma"] = tma; res[s]["tme"] = tme; res[s]["tmia"] = tmia; res[s]["tmic"] = tmic
-    
-    gtma, gtme, gtmia, gtmic = calcular_media_ponderada_tempos(acum_global)
-    globais = {"tma": gtma, "tme": gtme, "tmia": gtmia, "tmic": gtmic}
-
-    # CSAT
-    agentes_alvo = [x.strip().upper() for x in SETORES_AGENTES["NEGOCIACAO"]]
-    mapa_s = {" ".join(s.split()).upper(): s for s in servicos}
-    pos_g = 0; tot_g = 0
-    
-    for c_id in CONTAS_NEGOCIACAO:
-        for pid in PESQUISAS_IDS:
-            pg = 1
-            while True:
-                try:
-                    r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params={"data_inicial": d_ini.strftime("%Y-%m-%d"), "data_final": d_fim.strftime("%Y-%m-%d"), "pesquisa": pid, "id_conta": c_id, "limit": 1000, "page": pg})
-                    if r.status_code != 200: break
-                    d = r.json()
-                    if not d or not isinstance(d, list): break
-                    api_tot = 0
-                    for b in d:
-                        if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
-                            api_tot += sum(int(x.get("num_quantidade", 0)) for x in b["sintetico"])
-                            for rsp in b.get("respostas", []):
-                                nm = str(rsp.get("nom_agente", "")).upper()
-                                # Filtro equipe
-                                is_team = False
-                                for al in agentes_alvo:
-                                    if al in nm: is_team = True; break
-                                if not is_team: continue
-                                
-                                s_raw = str(rsp.get("nom_servico", "")).upper()
-                                s_clean = " ".join(s_raw.split())
-                                k_s = None
-                                if s_clean in mapa_s: k_s = mapa_s[s_clean]
-                                elif "LINK" in s_clean or "CLINTES" in s_clean:
-                                    for s in servicos:
-                                        if "LINK" in s or "CLINTES" in s: k_s = s; break
-                                
-                                if k_s:
-                                    v = float(rsp.get("nom_valor", -1))
-                                    if v >= 0:
-                                        tot_g += 1
-                                        if v >= 8: pos_g += 1
-                                        res[k_s]["csat_total"] += 1
-                                        if v >= 8: res[k_s]["csat_pos"] += 1
-                    if pg * 1000 >= api_tot: break
-                    if len(d) < 2: break
-                    pg += 1
-                except: break
-    
-    score_g = (pos/tot*100) if tot_g > 0 else 0.0
-    return res, score_g, tot_g, globais
-
-@st.cache_data(ttl=300)
-def buscar_auditoria_volumetria(token, d_ini, d_fim, lista_agentes):
-    ids_can = buscar_ids_canais(token)
-    stats = {n.upper(): {"Ativo": 0, "Passivo": 0} for n in lista_agentes}
-    nomes = list(stats.keys())
-    servicos_u = [s.upper() for s in SETORES_SERVICOS["NEGOCIACAO"]]
-    
-    for c in CONTAS_NEGOCIACAO:
-        pg = 1
-        while True:
-            try:
-                r = requests.get(f"{BASE_URL}/relAtAnalitico", headers={"Authorization": f"Bearer {token}"}, params={"id_conta": c, "data_inicial": f"{d_ini.strftime('%Y-%m-%d')} 00:00:00", "data_final": f"{d_fim.strftime('%Y-%m-%d')} 23:59:59", "limit": 100, "page": pg})
-                if r.status_code != 200: break
-                rows = r.json().get("rows", [])
-                if not rows: break
-                for rw in rows:
-                    if str(rw.get("id_tipo_integracao")) not in ids_can: continue
-                    s_api = str(rw.get("servico", "")).upper()
-                    
-                    is_t = False
-                    for s in servicos_u: 
-                        if s in s_api: is_t = True; break
-                    if "LINK" in s_api or "CLINTES" in s_api: is_t = True
-                    
-                    if is_t:
-                        ag_api = str(rw.get("agente", "")).strip().upper()
-                        for nm in nomes:
-                            if nm in ag_api:
-                                if "PASSIVA" in s_api: stats[nm]["Passivo"] += 1
-                                else: stats[nm]["Ativo"] += 1
-                                break
-                if len(rows) < 100: break
-                pg += 1
-            except: break
-            
-    res = []
-    for n, d in stats.items():
-        t = d["Ativo"] + d["Passivo"]
-        if t > 0: res.append({"Agente": n, "Total": t, "Ativo": d["Ativo"], "Passivo": d["Passivo"]})
-    return res
-
-# ==============================================================================
-# 5.5 PAUSAS (COM CORREÇÃO DE LÓGICA DE GAP + FIX CRASH EMPTY FLOAT)
-# ==============================================================================
-
-def _processar_agente_pausas(token, cod_agente, nome_agente, d_ini, d_fim, setor_nome):
-    headers = {"Authorization": f"Bearer {token}"}
-    curtas, almoco, logins, ranking = [], [], [], []
-    
-    # 1. Pausas Sistema
-    pausas = []
-    pg = 1
-    while pg <= 5:
-        try:
-            r = requests.get(f"{BASE_URL}/relAgentePausa", headers=headers, params={"dat_inicial": d_ini.strftime("%Y-%m-%d"), "dat_final": d_fim.strftime("%Y-%m-%d"), "cod_agente": cod_agente, "limit": 100, "pagina": pg}, timeout=10)
-            if r.status_code != 200: break
-            rows = r.json().get("rows", [])
-            if not rows: break
-            pausas.extend(rows)
-            pg += 1
-        except: break
-        
-    acum_curta = 0.0
-    for p in pausas:
-        m = str(p.get("pausa", "")).upper()
-        # FIX FLOAT VAZIO
+    for p in pausas_agente:
+        motivo = str(p.get("pausa", "")).upper()
         try: seg = float(p.get("seg_pausado", 0))
-        except: seg = 0.0
-            
-        mins = seg / 60
-        if any(x in m for x in ["MANHA", "TARDE", "NOITE"]):
-            if mins > LIMITES_PAUSA["CURTA"]: acum_curta += (mins - LIMITES_PAUSA["CURTA"])
-        if any(x in m for x in ["ALMOÇO", "ALMOCO", "PLANTÃO"]):
-            if mins > (LIMITES_PAUSA["LONGA"] + TOLERANCIA_VISUAL_ALMOCO):
-                almoco.append({"Agente": nome_agente, "Data": p.get("data_pausa", "")[:10], "Duração": formatar_tempo_humano(mins), "Status": f"Estourou {formatar_tempo_humano(mins - LIMITES_PAUSA['LONGA'])}"})
-    
-    if acum_curta > 0:
-        curtas.append({"Agente": nome_agente, "Excesso Acumulado": formatar_tempo_humano(acum_curta), "Valor Num": acum_curta, "Status": "ADVERTÊNCIA" if acum_curta > TOLERANCIA_MENSAL_EXCESSO else "Normal"})
+        except: seg = 0
+        minutos = seg / 60
         
-    q_pausas = len([p for p in pausas if "TERMINO" not in str(p.get("pausa")).upper() and "EXPEDIENTE" not in str(p.get("pausa")).upper()])
-    if q_pausas > 0: ranking.append({"Agente": nome_agente, "Qtd Pausas": q_pausas})
+        # Pausa Curta
+        if any(x in motivo for x in ["MANHA", "MANHÃ", "TARDE", "NOITE"]):
+            if minutos > LIMITES_PAUSA["CURTA"]:
+                acumulado_excesso_curta += (minutos - LIMITES_PAUSA["CURTA"])
+                
+        # Almoço
+        if any(x in motivo for x in ["ALMOÇO", "ALMOCO", "PLANTÃO", "PLANTAO"]):
+            if minutos > (LIMITES_PAUSA["LONGA"] + TOLERANCIA_VISUAL_ALMOCO):
+                excesso = minutos - LIMITES_PAUSA["LONGA"]
+                local_almoco.append({
+                    "Agente": nome_agente,
+                    "Data": p.get("data_pausa", "")[:10],
+                    "Duração": formatar_tempo_humano(minutos),
+                    "Status": f"Estourou {formatar_tempo_humano(excesso)}"
+                })
+    
+    status_curta = "Normal"
+    if acumulado_excesso_curta > TOLERANCIA_MENSAL_EXCESSO: status_curta = "ADVERTÊNCIA"
+    if acumulado_excesso_curta > 0:
+        local_curtas.append({
+            "Agente": nome_agente,
+            "Excesso Acumulado": formatar_tempo_humano(acumulado_excesso_curta),
+            "Valor Num": acumulado_excesso_curta,
+            "Status": status_curta
+        })
+        
+    qtd_pausas = len([p for p in pausas_agente if "TERMINO" not in str(p.get("pausa")).upper() and "EXPEDIENTE" not in str(p.get("pausa")).upper()])
+    if qtd_pausas > 0:
+        local_ranking.append({"Agente": nome_agente, "Qtd Pausas": qtd_pausas})
 
-    # 2. Logins (Pontualidade + Gaps)
-    logs = []
-    pg = 1
-    while pg <= 5:
+    # 2. LOGINS
+    page_log = 1
+    logins_raw = []
+    while page_log <= 2:
+        params_log = {"data_inicial": data_ini.strftime("%Y-%m-%d"), "data_final": data_fim.strftime("%Y-%m-%d"), "agente": cod_agente, "page": page_log, "limit": 100}
         try:
-            r = requests.get(f"{BASE_URL}/relAgenteLogin", headers=headers, params={"data_inicial": d_ini.strftime("%Y-%m-%d"), "data_final": d_fim.strftime("%Y-%m-%d"), "agente": cod_agente, "page": pg, "limit": 100})
+            r = requests.get(f"{BASE_URL}/relAgenteLogin", headers=headers, params=params_log, timeout=10)
+            if r.status_code != 200: break
             rows = r.json().get("rows", [])
             if not rows: break
-            logs.extend(rows)
-            pg += 1
+            logins_raw.extend(rows)
+            page_log += 1
         except: break
         
-    logs_ord = []
-    for l in logs:
-        di = l.get("data_login")
-        do = l.get("data_logout")
-        if di:
-            try:
-                dti = datetime.strptime(di, "%Y-%m-%d %H:%M:%S")
-                dto = datetime.strptime(do, "%Y-%m-%d %H:%M:%S") if do else None
-                logs_ord.append({"in": dti, "out": dto})
-            except: pass
-    logs_ord.sort(key=lambda x: x["in"])
-    
-    # Gap (Só para setores que deslogam)
-    if setor_nome in ["NEGOCIACAO", "CANCELAMENTO"]:
-        dias_com_almoco = set()
-        for i in range(len(logs_ord)-1):
-            sa = logs_ord[i]; sp = logs_ord[i+1]
-            if sa["out"]:
-                gap = (sp["in"] - sa["out"]).total_seconds() / 60
-                h = sa["out"].hour
-                d_str = sa["out"].strftime("%Y-%m-%d")
-                if (11 <= h <= 15 or 18 <= h <= 19) and gap > 20:
-                    if d_str not in dias_com_almoco:
-                        dias_com_almoco.add(d_str)
-                        st_g = "Ok"
-                        if gap > 120: st_g = f"⚠️ Longo (+{int(gap-120)}m)"
-                        tp = "Almoço (Inf.)" if h <= 15 else "Jantar (Inf.)"
-                        almoco.append({"Agente": nome_agente, "Data": sa["out"].strftime("%d/%m"), "Duração": formatar_tempo_humano(gap), "Status": f"{tp} - {st_g}"})
-
-    # Pontualidade
-    prim_logs = {}
-    for l in logs_ord:
-        k = l["in"].strftime("%Y-%m-%d")
-        if k not in prim_logs: prim_logs[k] = l["in"]
-    for d, dt in prim_logs.items():
-        if 1 < dt.minute <= 40: logins.append({"Agente": nome_agente, "Data": d, "Hora Entrada": dt.strftime("%H:%M:%S"), "Atraso": f"{dt.minute}m"})
+    min_logins = {}
+    for l in logins_raw:
+        d_str = l.get("data_login")
+        if not d_str: continue
+        try:
+            dt = datetime.strptime(d_str, "%Y-%m-%d %H:%M:%S")
+            d_key = dt.strftime("%Y-%m-%d")
+            if d_key not in min_logins: min_logins[d_key] = dt
+            else:
+                if dt < min_logins[d_key]: min_logins[d_key] = dt
+        except: pass
         
+    for d, dt in min_logins.items():
+        mins = dt.minute
+        # Regra Pontualidade: 02 a 40 = Atraso.
+        if 1 < mins <= 40:
+            local_logins.append({
+                "Agente": nome_agente,
+                "Data": d,
+                "Hora Entrada": dt.strftime("%H:%M:%S"),
+                "Atraso": f"{mins}m"
+            })
+            
+    return local_curtas, local_almoco, local_logins, local_ranking
+
+@st.cache_data(ttl=300)
+def processar_dados_pausas_supervisor(token, data_ini, data_fim, mapa_agentes):
+    """Processamento Paralelo: Pausas e Logins"""
+    curtas, almoco, logins, ranking = [], [], [], []
+    barra_progresso = st.progress(0, text="Auditando pausas e horários...")
+    total = len(mapa_agentes)
+    concluidos = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(_processar_agente_pausas, token, cod, nome, data_ini, data_fim): nome for cod, nome in mapa_agentes.items()}
+        for f in concurrent.futures.as_completed(futures):
+            concluidos += 1
+            barra_progresso.progress(int(concluidos/total * 100))
+            try:
+                c, a, l, r = f.result()
+                curtas.extend(c)
+                almoco.extend(a)
+                logins.extend(l)
+                ranking.extend(r)
+            except: pass
+    barra_progresso.empty()
     return curtas, almoco, logins, ranking
 
 @st.cache_data(ttl=300)
-def processar_dados_pausas_supervisor(token, d_ini, d_fim, mapa, setor_nome):
-    c, a, l, r = [], [], [], []
-    # Loop Sequencial para evitar MissingContext
-    barra = st.progress(0, text="Auditando Pausas...")
-    tot = len(mapa)
-    for i, (cod, nome) in enumerate(mapa.items()):
-        cc, aa, ll, rr = _processar_agente_pausas(token, cod, nome, d_ini, d_fim, setor_nome)
-        c.extend(cc); a.extend(aa); l.extend(ll); r.extend(rr)
-        barra.progress((i+1)/tot)
-    barra.empty()
-    return c, a, l, r
-
-@st.cache_data(ttl=60)
-def buscar_pre_pausas_detalhado(token, id_agente, data_ini, data_fim):
-    # CORREÇÃO DA VARIÁVEL: todas_pre_pausas em vez de pausas
-    todas_pre_pausas = []
-    pg = 1
-    while True:
-        try:
-            r = requests.get(f"{BASE_URL}/relPausasAgendadas", headers={"Authorization": f"Bearer {token}"}, 
-                             params={"data_inicial": data_ini.strftime("%Y-%m-%d"), "data_final": data_fim.strftime("%Y-%m-%d"), "agente": id_agente, "page": pg, "limit": 100}, timeout=10)
-            if r.status_code != 200: break
-            rows = r.json().get("rows", [])
-            if not rows: break
-            todas_pre_pausas.extend(rows)
-            pg += 1
-        except: break
-    return todas_pre_pausas
-
-def processar_dados_pre_pausas_geral(token, data_ini, data_fim, mapa_agentes):
-    resultados = {}
-    # Loop Sequencial
-    for cod, nome in mapa_agentes.items():
-        raw_data = buscar_pre_pausas_detalhado(token, cod, data_ini, data_fim)
-        if raw_data:
-            lst = []
-            for p in raw_data:
-                try:
-                    ini = datetime.strptime(p.get("data_pre", ""), "%Y-%m-%d %H:%M:%S").strftime("%d/%m %H:%M")
-                    fim = datetime.strptime(p.get("data_fim", ""), "%Y-%m-%d %H:%M:%S").strftime("%d/%m %H:%M") if p.get("data_fim") else "-"
-                    lst.append({"Início": ini, "Término": fim, "Duração": p.get("tempo_pre_pausado", "00:00:00"), "Motivo": p.get("pausa", "Agendada")})
-                except: pass
-            if lst: resultados[nome] = lst
-    return resultados
-
-@st.cache_data(ttl=300)
-def processar_ranking_geral(token, d_ini, d_fim, mapa, contas=[ID_CONTA]):
-    ids = list(mapa.keys())
-    can = buscar_ids_canais(token)
-    stats = {c: {"Vol": 0, "TMA": "--:--", "TME": "--:--", "TMIA": "--:--", "TMIC": "--:--"} for c in ids}
+def processar_ranking_geral(token, data_ini, data_fim, mapa_agentes):
+    """Gera dados completos: Volume, TMA, TME, TMIA, TMIC e CSAT"""
+    headers = {"Authorization": f"Bearer {token}"}
+    lista_rank = []
+    ids_validos = list(mapa_agentes.keys())
+    ids_canais = buscar_ids_canais(token)
     
-    # Volume e Tempos
+    # 1. Volume e Tempos
+    dados_stats = {cod: {"Vol": 0, "TMA": "--:--", "TME": "--:--", "TMIA": "--:--", "TMIC": "--:--"} for cod in ids_validos}
+    
+    params_stats = {
+        "data_inicial": f"{data_ini} 00:00:00",
+        "data_final": f"{data_fim} 23:59:59",
+        "agrupador": "agente",
+        "agente[]": ids_validos,
+        "canal[]": ids_canais,
+        "id_conta": ID_CONTA
+    }
     try:
-        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers={"Authorization": f"Bearer {token}"}, params={"data_inicial": f"{d_ini} 00:00:00", "data_final": f"{d_fim} 23:59:59", "agrupador": "agente", "agente[]": ids, "canal[]": can, "id_conta": ID_CONTA})
+        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params_stats)
         if r.status_code == 200:
             for item in r.json():
                 nome_api = str(item.get("agrupador", "")).upper()
-                cod_match = next((c for c, n in mapa.items() if n == nome_api or n in nome_api), None)
+                cod_match = next((c for c, n in mapa_agentes.items() if n == nome_api or n in nome_api), None)
                 if cod_match:
                     qtd = int(item.get("num_qtd", 0)) - int(item.get("num_qtd_abandonado", 0))
-                    stats[cod_match]["Vol"] += qtd
-                    stats[cod_match]["TMA"] = item.get("tma", "--:--")
-                    stats[cod_match]["TME"] = item.get("tme", "--:--")
-                    stats[cod_match]["TMIA"] = item.get("tmia", "--:--")
-                    stats[cod_match]["TMIC"] = item.get("tmic", "--:--")
+                    dados_stats[cod_match]["Vol"] += qtd
+                    dados_stats[cod_match]["TMA"] = item.get("tma", "--:--")
+                    dados_stats[cod_match]["TME"] = item.get("tme", "--:--")
+                    dados_stats[cod_match]["TMIA"] = item.get("tmia", "--:--")
+                    dados_stats[cod_match]["TMIC"] = item.get("tmic", "--:--")
     except: pass
 
-    # CSAT Sequencial
-    rnk = []
-    for cod in ids:
-        p, t = 0, 0
-        for ct in contas:
-            for pi in PESQUISAS_IDS:
-                pg = 1
-                while True:
-                    try:
-                        req = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers={"Authorization": f"Bearer {token}"}, params={"data_inicial": d_ini, "data_final": d_fim, "pesquisa": pi, "id_conta": ct, "limit": 1000, "page": pg, "agente[]": [cod]})
-                        if req.status_code!=200: break
-                        d = req.json()
-                        if not d or not isinstance(d, list): break
-                        tot_k = 0
-                        for b in d:
-                            if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
-                                tot_k += sum(int(x.get("num_quantidade", 0)) for x in b["sintetico"])
-                                for rs in b.get("respostas", []):
-                                    v = float(rs.get("nom_valor", -1))
-                                    if v >= 0: t += 1; 
-                                    if v >= 8: p += 1
-                        if pg*1000 >= tot_k: break
-                        if len(d) < 2: break
-                        pg += 1
-                    except: break
+    # 2. CSAT Individual (Paralelo)
+    def _fetch_csat_agente(cod_ag):
+        pos, tot = 0, 0
+        for pid in PESQUISAS_IDS:
+            pg = 1
+            while True:
+                pars = {"data_inicial": data_ini, "data_final": data_fim, "pesquisa": pid, "id_conta": ID_CONTA, "limit": 1000, "page": pg, "agente[]": [cod_ag]}
+                try:
+                    rr = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=pars)
+                    if rr.status_code != 200: break
+                    dd = rr.json()
+                    if not dd or not isinstance(dd, list): break
+                    found_pg = False
+                    for b in dd:
+                        if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
+                            found_pg = True
+                            for rsp in b.get("respostas", []):
+                                try:
+                                    val = float(rsp.get("nom_valor", -1))
+                                    if val >= 0:
+                                        tot += 1
+                                        if val >= 8: pos += 1
+                                except: pass
+                    if not found_pg and len(dd) < 5: break
+                    if len(dd) < 100: break
+                    pg += 1
+                except: break
+        return pos, tot
+
+    dados_csat = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futs = {executor.submit(_fetch_csat_agente, cod): cod for cod in ids_validos}
+        for f in concurrent.futures.as_completed(futs):
+            cod = futs[f]
+            try:
+                p, t = f.result()
+                dados_csat[cod] = (p, t)
+            except: dados_csat[cod] = (0, 0)
+            
+    # Monta Lista Final
+    for cod, nome in mapa_agentes.items():
+        st_data = dados_stats[cod]
+        pos, tot = dados_csat.get(cod, (0, 0))
+        score = (pos/tot*100) if tot > 0 else 0.0
         
-        st_data = stats[cod]
-        if st_data["Vol"] > 0 or t > 0:
-            rnk.append({
-                "Agente": mapa[cod],
+        if st_data["Vol"] > 0 or tot > 0:
+            lista_rank.append({
+                "Agente": nome,
                 "Volume": st_data["Vol"],
                 "TMA": st_data["TMA"],
                 "TME": st_data["TME"],
                 "TMIA": st_data["TMIA"],
                 "TMIC": st_data["TMIC"],
-                "CSAT Score": (p/t*100) if t>0 else 0.0,
-                "CSAT Qtd": t
+                "CSAT Score": score,
+                "CSAT Qtd": tot
             })
             
-    return rnk
+    return lista_rank
 
-def eleger_melhor_do_mes(df):
-    if df.empty: return None
-    df = df[df['Volume'] > 0].copy()
-    if df.empty: return None
-    df['S_TMA'] = df['TMA'].apply(time_str_to_seconds).rank()
-    df['S_TMIA'] = df['TMIA'].apply(time_str_to_seconds).rank()
-    df['S_CSAT'] = df['CSAT Score'].rank(ascending=False)
-    df['Final'] = df['S_TMA'] + df['S_TMIA'] + df['S_CSAT']
-    return df.sort_values('Final').iloc[0]['Agente']
-
-def obter_ids_do_setor(mapa_completo, setor_nome):
-    nomes_alvo = [n.strip().upper() for n in SETORES_AGENTES.get(setor_nome, [])]
-    agentes_finais = {}
-    for alvo in nomes_alvo:
-        if alvo in mapa_completo:
-            agentes_finais[mapa_completo[alvo]] = alvo
-        else:
-            for nome_real, cod in mapa_completo.items():
-                if alvo in nome_real.split():
-                    if alvo in NOMES_COMUNS_PRIMEIRO:
-                         if alvo == nome_real.split()[0]:
-                            agentes_finais[cod] = nome_real; break
-                    else:
-                        agentes_finais[cod] = nome_real; break
-    return agentes_finais
-
-def calcular_produtividade_meta_liquida(token, id_agente, nome_agente, data_ini, data_fim):
-    headers = {"Authorization": f"Bearer {token}"}
-    total_logado = 0
-    dias_trabalhados = set()
-    pg = 1
-    while pg <= 10:
-        try:
-            r = requests.get(f"{BASE_URL}/relAgenteLogin", headers=headers, params={"data_inicial": data_ini.strftime("%Y-%m-%d"), "data_final": data_fim.strftime("%Y-%m-%d"), "agente": id_agente, "page": pg, "limit": 100})
-            rows = r.json().get("rows", [])
-            if not rows: break
-            for row in rows:
-                d_in = row.get("data_login")
-                d_out = row.get("data_logout")
-                if d_in:
-                    dt_in = datetime.strptime(d_in, "%Y-%m-%d %H:%M:%S")
-                    dias_trabalhados.add(dt_in.strftime("%Y-%m-%d"))
-                    if not d_out: dt_out = datetime.now() if datetime.now().date() <= data_fim else dt_in
-                    else: dt_out = datetime.strptime(d_out, "%Y-%m-%d %H:%M:%S")
-                    total_logado += (dt_out - dt_in).total_seconds()
-            if len(rows) < 100: break
-            pg += 1
-        except: break
-
-    total_pausa = 0
-    pp = 1
-    while pp <= 10:
-        try:
-            r = requests.get(f"{BASE_URL}/relAgentePausa", headers=headers, params={"dat_inicial": data_ini.strftime("%Y-%m-%d"), "dat_final": data_fim.strftime("%Y-%m-%d"), "cod_agente": id_agente, "pagina": pp, "limit": 100})
-            rows = r.json().get("rows", [])
-            if not rows: break
-            for row in rows:
-                try: total_pausa += float(row.get("seg_pausado", 0))
-                except: pass
-            pp += 1
-        except: break
-
-    qtd_dias = len(dias_trabalhados)
-    if qtd_dias == 0: return {"Agente": nome_agente, "Dias": 0, "Logado": "-", "Pausado": "-", "Líquido Real": "-", "Meta Líquida": "-", "Saldo": "-", "_sort": -1}
-        
-    meta_diaria_liquida = 7.5 * 3600 
-    meta_total_liquida = qtd_dias * meta_diaria_liquida
-    liquido_real = total_logado - total_pausa
-    saldo = liquido_real - meta_total_liquida
+def eleger_melhor_do_mes(df_rank):
+    if df_rank.empty: return None
     
-    saldo_str = seconds_to_hms(abs(saldo))
-    saldo_fmt = f"✅ +{saldo_str}" if saldo >= 0 else f"🔻 -{saldo_str}"
+    df_calc = df_rank.copy()
+    df_calc['TMA_Seg'] = df_calc['TMA'].apply(time_str_to_seconds)
+    df_calc['TMIA_Seg'] = df_calc['TMIA'].apply(time_str_to_seconds)
+    
+    df_calc = df_calc[(df_calc['Volume'] > 0) & (df_calc['CSAT Qtd'] > 0)].copy()
+    if df_calc.empty: return None
+    
+    df_calc['Rank_TMA'] = df_calc['TMA_Seg'].rank(ascending=True)
+    df_calc['Rank_TMIA'] = df_calc['TMIA_Seg'].rank(ascending=True)
+    df_calc['Rank_CSAT'] = df_calc['CSAT Score'].rank(ascending=False)
+    
+    df_calc['Score_Final'] = df_calc['Rank_TMA'] + df_calc['Rank_TMIA'] + df_calc['Rank_CSAT']
+    
+    min_score = df_calc['Score_Final'].min()
+    mvps = df_calc[df_calc['Score_Final'] == min_score]
+    
+    nomes = mvps['Agente'].tolist()
+    return ", ".join(nomes)
 
-    return {
-        "Agente": nome_agente,
-        "Dias": qtd_dias,
-        "Logado": seconds_to_hms(total_logado),
-        "Pausado": seconds_to_hms(total_pausa),
-        "Líquido Real": seconds_to_hms(liquido_real),
-        "Meta Líquida": seconds_to_hms(meta_total_liquida),
-        "Saldo": saldo_fmt,
-        "_sort": liquido_real
+# ==============================================================================
+# 5.1 FUNÇÕES MULTISETOR (NOVAS - ADICIONADAS PARA NÃO ALTERAR AS ANTIGAS)
+# ==============================================================================
+
+def buscar_agentes_online_filtrado_setor(token, setor_nome):
+    """Versão genérica do monitoramento online para qualquer setor."""
+    headers = {"Authorization": f"Bearer {token}"}
+    agentes_online_filtrados = []
+    
+    # Obtém a lista de agentes do setor especificado
+    lista_alvo = SETORES_AGENTES.get(setor_nome, [])
+    lista_upper = [x.strip().upper() for x in lista_alvo]
+    
+    try:
+        r = requests.get(f"{BASE_URL}/agentesOnline", headers=headers)
+        if r.status_code == 200:
+            todos_online = r.json()
+            for agente in todos_online:
+                nome_full = str(agente.get("nom_agente", "")).strip().upper()
+                partes_nome = nome_full.split()
+                if not partes_nome: continue
+                
+                match_encontrado = False
+                for alvo in lista_upper:
+                    # Verifica nome exato ou contido nas partes
+                    if alvo in partes_nome: match_encontrado = True; break
+                    # Verifica logica de primeiro nome se necessario (adaptado do original)
+                    if alvo in NOMES_COMUNS_PRIMEIRO and alvo == partes_nome[0]: match_encontrado = True; break
+                
+                if match_encontrado:
+                    agentes_online_filtrados.append(agente)
+    except: pass
+    return agentes_online_filtrados
+
+@st.cache_data(ttl=300)
+def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome):
+    """Versão genérica da busca de dados do supervisor para qualquer setor."""
+    headers = {"Authorization": f"Bearer {token}"}
+    ids_agentes = []
+    mapa_agentes = {}
+    
+    # Define as listas baseadas no setor escolhido
+    lista_nomes_alvo = SETORES_AGENTES.get(setor_nome, [])
+    lista_servicos_alvo = SETORES_SERVICOS.get(setor_nome, [])
+    
+    nomes_upper = [x.strip().upper() for x in lista_nomes_alvo]
+    
+    # 1. Mapeamento de Agentes (Igual ao original, mas usando a lista dinâmica)
+    pagina = 1
+    while True:
+        try:
+            r = requests.get(f"{BASE_URL}/agentes", headers=headers, params={"limit": 100, "page": pagina, "bol_cancelado": 0})
+            if r.status_code != 200: break
+            data = r.json()
+            rows = data.get("result", [])
+            if not rows: break
+            for agente in rows:
+                nome_raw = str(agente.get("nome_exibicao") or agente.get("agente")).strip()
+                nome_upper = nome_raw.upper() 
+                partes_nome = nome_upper.split()
+                if not partes_nome: continue
+                match_encontrado = False
+                for alvo in nomes_upper:
+                    if alvo in partes_nome: match_encontrado = True; break
+                    if alvo in NOMES_COMUNS_PRIMEIRO and alvo == partes_nome[0]: match_encontrado = True; break
+                if match_encontrado: 
+                    cod = str(agente.get("cod_agente"))
+                    ids_agentes.append(cod)
+                    mapa_agentes[cod] = nome_upper
+            if pagina * 100 >= data.get("total", 0): break
+            pagina += 1
+        except: break
+
+    ids_canais = buscar_ids_canais(token)
+    
+    # Inicializa resultados com os serviços deste setor
+    resultados = {
+        s: {
+            "num_qtd": 0, "tma": "--:--", "tme": "--:--", 
+            "tmia": "--:--", "tmic": "--:--", "csat_pos": 0, "csat_total": 0
+        } 
+        for s in lista_servicos_alvo
     }
 
-def processar_produtividade_geral(token, data_ini, data_fim, setor_sel):
-    mapa_completo = mapear_todos_agentes(token)
-    agentes_do_setor = obter_ids_do_setor(mapa_completo, setor_sel)
+    if not ids_agentes: return resultados, 0.0, 0, mapa_agentes, {}
+    
+    # 2. Dados Globais do Setor
+    dados_globais = {"tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--"}
+    try:
+        params_globais = {
+            "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+            "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+            "agrupador": "conta", 
+            "agente[]": ids_agentes,
+            "canal[]": ids_canais,
+            "id_conta": ID_CONTA
+        }
+        r_global = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params_globais)
+        if r_global.status_code == 200:
+            lista_global = r_global.json()
+            if lista_global and isinstance(lista_global, list):
+                item_global = lista_global[0]
+                dados_globais["tma"] = item_global.get("tma", "--:--")
+                dados_globais["tme"] = item_global.get("tme", "--:--")
+                dados_globais["tmia"] = item_global.get("tmia", "--:--")
+                dados_globais["tmic"] = item_global.get("tmic", "--:--")
+    except: pass
+
+    # 3. Estatísticas por Serviço (Usando lista_servicos_alvo)
+    for servico in lista_servicos_alvo:
+        params = {
+            "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+            "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+            "agrupador": "servico",
+            "agente[]": ids_agentes,
+            "canal[]": ids_canais,
+            "id_conta": ID_CONTA,
+            "servico": servico
+        }
+        try:
+            r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params)
+            if r.status_code == 200:
+                lista = r.json()
+                if lista and isinstance(lista, list):
+                    item = lista[0]
+                    qtd_bruta = int(item.get("num_qtd", 0))
+                    qtd_aband = int(item.get("num_qtd_abandonado", 0))
+                    resultados[servico]["num_qtd"] = qtd_bruta - qtd_aband
+                    resultados[servico]["tma"] = item.get("tma", "--:--")
+                    resultados[servico]["tme"] = item.get("tme", "--:--")
+                    resultados[servico]["tmia"] = item.get("tmia", "--:--")
+                    resultados[servico]["tmic"] = item.get("tmic", "--:--")
+        except: pass
+
+    # 4. Satisfação (CSAT)
+    csat_geral_pos = 0; csat_geral_total = 0
+    for p_id in PESQUISAS_IDS:
+        p_page = 1
+        while True:
+            p_params = {
+                "data_inicial": data_ini.strftime("%Y-%m-%d"), 
+                "data_final": data_fim.strftime("%Y-%m-%d"), 
+                "pesquisa": p_id, "id_conta": ID_CONTA, "limit": 1000, 
+                "page": p_page, "agente[]": ids_agentes
+            }
+            try:
+                r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=p_params)
+                if r.status_code != 200: break
+                data = r.json()
+                if not data or not isinstance(data, list): break
+                total_api = 0
+                for bloco in data:
+                    if str(bloco.get("id_pergunta", "")) in IDS_PERGUNTAS_VALIDAS:
+                        if bloco.get("sintetico"): total_api += sum(int(x.get("num_quantidade", 0)) for x in bloco["sintetico"])
+                        for resp in bloco.get("respostas", []):
+                            try:
+                                servico_resp = str(resp.get("nom_servico", "")).upper().strip()
+                                val_raw = resp.get("nom_valor")
+                                if val_raw and val_raw != "": nota = int(float(val_raw))
+                                else: nota = -1
+                                
+                                if nota >= 0: 
+                                    csat_geral_total += 1
+                                    if nota >= 8: csat_geral_pos += 1
+                                    # Verifica se o serviço pertence ao setor atual
+                                    if servico_resp in lista_servicos_alvo:
+                                        resultados[servico_resp]["csat_total"] += 1
+                                        if nota >= 8: resultados[servico_resp]["csat_pos"] += 1
+                            except: pass
+                if (p_page * 1000) >= total_api: break
+                if len(data) < 2: break
+                p_page += 1
+            except: break
+
+    score_geral = (csat_geral_pos / csat_geral_total * 100) if csat_geral_total > 0 else 0.0
+    return resultados, score_geral, csat_geral_total, mapa_agentes, dados_globais
+
+# ==============================================================================
+# 5.2 FUNÇÕES DE PRÉ-PAUSA
+# ==============================================================================
+
+@st.cache_data(ttl=60)
+def buscar_pre_pausas_detalhado(token, id_agente, data_ini, data_fim):
+    """Busca dados brutos de pré-pausas agendadas via endpoint dedicado."""
+    url = f"{BASE_URL}/relPausasAgendadas"
+    headers = {"Authorization": f"Bearer {token}"}
+    todas_pre_pausas = []
+    page = 1
+    while True:
+        params = {
+            "data_inicial": data_ini.strftime("%Y-%m-%d"),
+            "data_final": data_fim.strftime("%Y-%m-%d"),
+            "agente": id_agente,
+            "page": page,
+            "limit": 100
+        }
+        try:
+            r = requests.get(url, headers=headers, params=params, timeout=10)
+            if r.status_code != 200: break
+            data = r.json()
+            rows = data.get("rows", [])
+            if not rows: break
+            todas_pre_pausas.extend(rows)
+            if len(rows) < 100: break
+            page += 1
+        except: break
+    return todas_pre_pausas
+
+def processar_dados_pre_pausas_geral(token, data_ini, data_fim, mapa_agentes):
+    """Processa pré-pausas para todos os agentes do mapa e lista individualmente."""
     resultados = []
     
-    # FIX: Loop Sequencial
-    bar = st.progress(0, text="Calculando Produtividade...")
-    tot = len(agentes_do_setor)
-    for i, (aid, anome) in enumerate(agentes_do_setor.items()):
-        res = calcular_produtividade_meta_liquida(token, aid, anome, data_ini, data_fim)
-        if res["_sort"] != -1: resultados.append(res)
-        bar.progress((i+1)/tot)
-    bar.empty()
+    # Função interna para thread
+    def _fetch_pre_pausa(cod, nome):
+        raw_data = buscar_pre_pausas_detalhado(token, cod, data_ini, data_fim)
+        if not raw_data: return []
+        
+        lista_retorno = []
+        for p in raw_data:
+            data_ini_str = p.get("data_pre", "")
+            data_fim_str = p.get("data_fim", "")
+            duracao_str = p.get("tempo_pre_pausado", "00:00:00")
+            motivo_str = p.get("pausa", "Agendada") # Novo: Captura o motivo
+            
+            # Formatação de datas
+            inicio_fmt = data_ini_str
+            fim_fmt = data_fim_str
+            try:
+                if data_ini_str:
+                    inicio_fmt = datetime.strptime(data_ini_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
+                if data_fim_str:
+                    fim_fmt = datetime.strptime(data_fim_str, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S")
+            except: pass
+
+            lista_retorno.append({
+                "Agente": nome,
+                "Início": inicio_fmt,
+                "Término": fim_fmt,
+                "Duração": duracao_str,
+                "Motivo": motivo_str
+            })
+        return lista_retorno
+
+    # Execução Paralela
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(_fetch_pre_pausa, cod, nome): nome for cod, nome in mapa_agentes.items()}
+        for f in concurrent.futures.as_completed(futures):
+            try:
+                res = f.result()
+                if res: resultados.extend(res)
+            except: pass
+            
     return resultados
 
 # ==============================================================================
-# 5.7 FUNÇÕES DE PLANTÃO E CLIENTE INTERNO (RESTAURADAS COM LÓGICA)
+# 5.3 FUNÇÕES ESPECIAIS SUPORTE
 # ==============================================================================
 
+@st.cache_data(ttl=300)
 def buscar_dados_plantao(token, data_ini, data_fim):
-    """Lógica para o plantão: Filtra agentes da LISTA_PLANTAO e busca estatísticas."""
+    """Busca dados específicos para os agentes do plantão (LISTA_PLANTAO) com estatísticas por serviço e CSAT."""
     headers = {"Authorization": f"Bearer {token}"}
-    mapa = mapear_todos_agentes(token)
     ids_plantao = []
     mapa_plantao = {}
     
-    for nome in LISTA_PLANTAO:
-        nome_upper = nome.strip().upper()
-        # Busca exata ou primeiro nome
-        for nome_real, cod in mapa.items():
-            if nome_upper in nome_real.split():
-                if cod not in ids_plantao:
-                    ids_plantao.append(cod)
-                    mapa_plantao[cod] = nome_real
-                break
+    # 1. Identificar IDs dos agentes do plantão
+    pagina = 1
+    nomes_upper = [x.strip().upper() for x in LISTA_PLANTAO]
     
-    if not ids_plantao:
-        return pd.DataFrame(), {}, 0.0
+    while True:
+        try:
+            r = requests.get(f"{BASE_URL}/agentes", headers=headers, params={"limit": 100, "page": pagina, "bol_cancelado": 0})
+            if r.status_code != 200: break
+            data = r.json()
+            rows = data.get("result", [])
+            if not rows: break
+            for agente in rows:
+                nome_raw = str(agente.get("nome_exibicao") or agente.get("agente")).strip().upper()
+                partes = nome_raw.split()
+                match = False
+                for alvo in nomes_upper:
+                    if alvo in partes: match = True; break
+                if match:
+                    ids_plantao.append(str(agente.get("cod_agente")))
+                    mapa_plantao[str(agente.get("cod_agente"))] = nome_raw
+            if pagina * 100 >= data.get("total", 0): break
+            pagina += 1
+        except: break
+        
+    ids_canais = buscar_ids_canais(token)
+    
+    if not ids_plantao: return pd.DataFrame(), {}, {}
 
-    # Busca CSAT
-    res_csat = []
-    pos = 0; tot = 0
-    for pid in PESQUISAS_IDS:
-        pg = 1
-        while True:
-            try:
-                r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params={"data_inicial": data_ini, "data_final": data_fim, "pesquisa": pid, "id_conta": ID_CONTA, "limit": 1000, "page": pg, "agente[]": ids_plantao})
-                if r.status_code != 200: break
-                d = r.json()
-                if not d or not isinstance(d, list): break
-                t_k = 0
-                for b in d:
-                    if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
-                        t_k += sum(int(x.get("num_quantidade",0)) for x in b["sintetico"])
-                        for rsp in b.get("respostas", []):
-                            v = float(rsp.get("nom_valor", -1))
-                            if v >= 0:
-                                tot += 1; 
-                                if v >= 8: pos += 1
-                                res_csat.append({"Agente": rsp.get("nom_agente"), "Nota": v})
-                if pg * 1000 >= t_k: break
-                if len(d) < 2: break
-                pg += 1
-            except: break
-            
-    score = (pos/tot*100) if tot > 0 else 0.0
-    
-    # Busca Volume por Serviço (Estatístico)
-    stats_serv = {}
-    ids_can = buscar_ids_canais(token)
+    # 2. Buscar estatísticas GERAIS (agrupado por agente)
+    lista_stats_agente = []
+    params_agente = {
+        "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+        "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+        "agrupador": "agente", 
+        "agente[]": ids_plantao,
+        "canal[]": ids_canais,
+        "id_conta": ID_CONTA
+    }
     try:
-        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params={"data_inicial": f"{data_ini} 00:00:00", "data_final": f"{data_fim} 23:59:59", "agrupador": "servico", "agente[]": ids_plantao, "canal[]": ids_can, "id_conta": ID_CONTA})
+        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params_agente)
         if r.status_code == 200:
             for item in r.json():
-                s = item.get("agrupador")
-                stats_serv[s] = {
-                    "num_qtd": int(item.get("num_qtd",0)) - int(item.get("num_qtd_abandonado",0)),
-                    "tma": item.get("tma"), "tme": item.get("tme"), "tmia": item.get("tmia"), "tmic": item.get("tmic")
+                nome_api = str(item.get("agrupador", "")).upper()
+                agente_nome = next((n for c, n in mapa_plantao.items() if n == nome_api or n in nome_api), nome_api)
+                
+                # Inicializa stats do agente
+                lista_stats_agente.append({
+                    "Agente": agente_nome,
+                    "Volume": int(item.get("num_qtd", 0)) - int(item.get("num_qtd_abandonado", 0)),
+                    "TMA": item.get("tma", "--:--"),
+                    "TMIA": item.get("tmia", "--:--"),
+                    "CSAT": 0.0, # Placeholder
+                    "Qtd CSAT": 0
+                })
+    except: pass
+    
+    # 3. Buscar estatísticas por SERVIÇO (Agrupado por serviço, filtrado pelos agentes)
+    stats_por_servico = {}
+    params_servico = {
+        "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+        "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+        "agrupador": "servico", 
+        "agente[]": ids_plantao, # Filtro Crucial
+        "canal[]": ids_canais,
+        "id_conta": ID_CONTA
+    }
+    try:
+        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params_servico)
+        if r.status_code == 200:
+            for item in r.json():
+                serv = item.get("agrupador", "Outros")
+                stats_por_servico[serv] = {
+                    "num_qtd": int(item.get("num_qtd", 0)) - int(item.get("num_qtd_abandonado", 0)),
+                    "tma": item.get("tma", "--:--"),
+                    "tme": item.get("tme", "--:--"),
+                    "tmia": item.get("tmia", "--:--"),
+                    "tmic": item.get("tmic", "--:--")
                 }
     except: pass
-    
-    # Monta DF básico por agente
-    stats_ag = []
-    try:
-        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params={"data_inicial": f"{data_ini} 00:00:00", "data_final": f"{data_fim} 23:59:59", "agrupador": "agente", "agente[]": ids_plantao, "canal[]": ids_can, "id_conta": ID_CONTA})
-        if r.status_code == 200:
-            for item in r.json():
-                ag_nm = item.get("agrupador")
-                vol = int(item.get("num_qtd",0)) - int(item.get("num_qtd_abandonado",0))
-                # Calcula CSAT individual simples
-                p_ag = 0; t_ag = 0
-                for c in res_csat:
-                    if str(c["Agente"]).upper() == str(ag_nm).upper():
-                        t_ag += 1
-                        if c["Nota"] >= 8: p_ag += 1
-                sc_ag = (p_ag/t_ag*100) if t_ag > 0 else 0.0
-                
-                stats_ag.append({"Agente": ag_nm, "Volume": vol, "TMA": item.get("tma"), "CSAT": sc_ag})
-    except: pass
-    
-    return pd.DataFrame(stats_ag), stats_serv, score
 
-def buscar_dados_cliente_interno(token, data_ini, data_fim, lista_nomes):
-    """Lógica para Cliente Interno (Conta 5) filtrada por agentes de Suporte."""
-    headers = {"Authorization": f"Bearer {token}"}
-    mapa = mapear_todos_agentes(token)
-    ids_suporte = []
-    
-    for nome in lista_nomes:
-        nome_upper = nome.strip().upper()
-        for nome_real, cod in mapa.items():
-            if nome_upper in nome_real.split():
-                if cod not in ids_suporte: ids_suporte.append(cod)
-                break
-                
-    if not ids_suporte:
-        return {"TMA": "--", "TME": "--", "TMIA": "--"}, 0.0, 0, pd.DataFrame()
-
-    ids_can = buscar_ids_canais(token) # Canais globais funcionam para conta 5 também
-    
-    # 1. Estatísticas Globais da Conta 5 (Filtradas pelos agentes)
-    stats = {"TMA": "--", "TME": "--", "TMIA": "--"}
-    try:
-        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params={"data_inicial": f"{data_ini} 00:00:00", "data_final": f"{data_fim} 23:59:59", "agrupador": "conta", "agente[]": ids_suporte, "canal[]": ids_can, "id_conta": ID_CONTA_CLIENTE_INTERNO})
-        if r.status_code == 200:
-            l = r.json()
-            if l:
-                i = l[0]
-                stats = {"TMA": i.get("tma"), "TME": i.get("tme"), "TMIA": i.get("tmia")}
-    except: pass
-    
-    # 2. CSAT e Lista Analítica
-    lista_analitica = []
-    pos = 0; tot = 0
-    
+    # 4. Calcular CSAT (Satisfação) dos agentes
+    csat_scores = {}
     for pid in PESQUISAS_IDS:
         pg = 1
         while True:
+            pars = {"data_inicial": data_ini.strftime("%Y-%m-%d"), "data_final": data_fim.strftime("%Y-%m-%d"), "pesquisa": pid, "id_conta": ID_CONTA, "limit": 1000, "page": pg, "agente[]": ids_plantao}
             try:
-                r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params={"data_inicial": data_ini, "data_final": data_fim, "pesquisa": pid, "id_conta": ID_CONTA_CLIENTE_INTERNO, "limit": 1000, "page": pg, "agente[]": ids_suporte})
-                if r.status_code != 200: break
-                d = r.json()
-                if not d or not isinstance(d, list): break
-                t_k = 0
-                for b in d:
+                rr = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=pars)
+                if rr.status_code != 200: break
+                dd = rr.json()
+                if not dd or not isinstance(dd, list): break
+                total_k = 0
+                for b in dd:
                     if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
-                        t_k += sum(int(x.get("num_quantidade",0)) for x in b["sintetico"])
+                        if b.get("sintetico"): total_k += sum(int(x.get("num_quantidade", 0)) for x in b["sintetico"])
                         for rsp in b.get("respostas", []):
-                            v = float(rsp.get("nom_valor", -1))
-                            if v >= 0:
-                                tot += 1
-                                if v >= 8: pos += 1
-                                lista_analitica.append({
-                                    "Data": rsp.get("dat_resposta"),
-                                    "Agente": rsp.get("nom_agente"),
-                                    "Cliente": rsp.get("nom_contato"),
-                                    "Nota": v,
-                                    "Comentario": rsp.get("nom_resposta"),
-                                    "Protocolo": rsp.get("num_protocolo")
-                                })
-                if pg * 1000 >= t_k: break
-                if len(d) < 2: break
+                            nom_ag = str(rsp.get("nom_agente","")).upper()
+                            # Normaliza nome
+                            nome_match = next((n for c, n in mapa_plantao.items() if n == nom_ag or n in nom_ag), nom_ag)
+                            
+                            val = float(rsp.get("nom_valor", -1))
+                            if val >= 0:
+                                if nome_match not in csat_scores: csat_scores[nome_match] = {"pos": 0, "tot": 0}
+                                csat_scores[nome_match]["tot"] += 1
+                                if val >= 8: csat_scores[nome_match]["pos"] += 1
+                if (pg * 1000) >= total_k: break
+                if len(dd) < 2: break
                 pg += 1
             except: break
             
-    score = (pos/tot*100) if tot > 0 else 0.0
-    
-    # CRITICAL FIX: Ensure 'Nota_Num' column exists for filtering later
-    df_ret = pd.DataFrame(lista_analitica)
-    if not df_ret.empty:
-        df_ret['Nota_Num'] = pd.to_numeric(df_ret['Nota'], errors='coerce').fillna(0).astype(int)
-    else:
-        df_ret['Nota_Num'] = 0
+    # 5. Unificar CSAT na tabela
+    for row in lista_stats_agente:
+        ag = row["Agente"]
+        if ag in csat_scores:
+            d = csat_scores[ag]
+            row["Qtd CSAT"] = d["tot"]
+            row["CSAT"] = (d["pos"] / d["tot"] * 100) if d["tot"] > 0 else 0.0
+            
+    return pd.DataFrame(lista_stats_agente), stats_por_servico, {}
 
-    return stats, score, tot, df_ret
+@st.cache_data(ttl=300)
+def buscar_dados_cliente_interno(token, data_ini, data_fim, nomes_suporte_validos):
+    """Busca dados da conta ID 5 (Cliente Interno) filtrando por agentes do Suporte."""
+    headers = {"Authorization": f"Bearer {token}"}
+    ids_canais = buscar_ids_canais(token) 
+    
+    # Prepara lista para filtro
+    nomes_validos_upper = [x.strip().upper() for x in nomes_suporte_validos]
+    
+    # 1. Estatísticas Gerais (Card de Tempo)
+    stats_globais = {"TMA": "--:--", "TME": "--:--", "TMIA": "--:--"}
+    try:
+        params = {
+            "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
+            "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
+            "agrupador": "conta", 
+            "canal[]": ids_canais,
+            "id_conta": ID_CONTA_CLIENTE_INTERNO 
+        }
+        r = requests.get(f"{BASE_URL}/relAtEstatistico", headers=headers, params=params)
+        if r.status_code == 200:
+            lista = r.json()
+            if lista and isinstance(lista, list):
+                item = lista[0]
+                stats_globais["TMA"] = item.get("tma", "--:--")
+                stats_globais["TME"] = item.get("tme", "--:--")
+                stats_globais["TMIA"] = item.get("tmia", "--:--")
+    except: pass
+    
+    # 2. Pesquisas (Tabela e CSAT)
+    lista_pesquisas = []
+    csat_pos = 0; csat_total = 0
+    
+    for p_id in PESQUISAS_IDS:
+        pg = 1
+        while True:
+            params_p = {
+                "data_inicial": data_ini.strftime("%Y-%m-%d"), 
+                "data_final": data_fim.strftime("%Y-%m-%d"), 
+                "pesquisa": p_id, 
+                "id_conta": ID_CONTA_CLIENTE_INTERNO, 
+                "limit": 1000, 
+                "page": pg
+            }
+            try:
+                r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=params_p)
+                if r.status_code != 200: break
+                data = r.json()
+                if not data or not isinstance(data, list): break
+                
+                total_api = 0
+                for bloco in data:
+                    if str(bloco.get("id_pergunta", "")) in IDS_PERGUNTAS_VALIDAS:
+                        if bloco.get("sintetico"): total_api += sum(int(x.get("num_quantidade", 0)) for x in bloco["sintetico"])
+                        for resp in bloco.get("respostas", []):
+                            # FILTRO DE AGENTE (Regra de Ouro: Adicionando validação)
+                            nome_agente_resp = str(resp.get("nom_agente", "")).strip().upper()
+                            partes_nome = nome_agente_resp.split()
+                            eh_do_suporte = False
+                            if partes_nome:
+                                for alvo in nomes_validos_upper:
+                                    if alvo in partes_nome: eh_do_suporte = True; break
+                            
+                            if eh_do_suporte:
+                                val_raw = resp.get("nom_valor")
+                                if val_raw and val_raw != "": 
+                                    nota = int(float(val_raw))
+                                    csat_total += 1
+                                    if nota >= 8: csat_pos += 1
+                                    
+                                    lista_pesquisas.append({
+                                        "Data": resp.get("dat_resposta"),
+                                        "Cliente": resp.get("nom_contato"),
+                                        "Agente": nome_agente_resp,
+                                        "Nota": nota,
+                                        "Comentario": resp.get("nom_resposta"),
+                                        "Protocolo": resp.get("num_protocolo")
+                                    })
+                
+                if (pg * 1000) >= total_api: break
+                if len(data) < 2: break
+                pg += 1
+            except: break
+            
+    df_pesquisas = pd.DataFrame(lista_pesquisas)
+    score = (csat_pos / csat_total * 100) if csat_total > 0 else 0.0
+    
+    return stats_globais, score, csat_total, df_pesquisas
 
 # ==============================================================================
-# 5.8 COMPONENTES VISUAIS (VISUAL)
+# 5. COMPONENTES VISUAIS
 # ==============================================================================
 
 def render_podium(titulo, dados, metrica, formato, inverso=False):
     st.markdown(f"##### {titulo}")
     if not dados: return st.info("Sem dados.")
     c1, c2, c3 = st.columns(3)
+    
     if metrica in ["TMA", "TMIA"]:
         rev = True if inverso else False
         top = sorted(dados, key=lambda x: time_str_to_seconds(x[metrica]), reverse=rev)[:3]
     else:
         rev = False if inverso else True
         top = sorted(dados, key=lambda x: x[metrica], reverse=rev)[:3]
+    
     emojis = ["🥇", "🥈", "🥉"] if not inverso else ["🔻", "🔻", "🔻"]
     cols = [c1, c2, c3]
+    
     for i, item in enumerate(top):
         with cols[i]:
             val_str = f"{item[metrica]:.2f}%" if formato == "%" else str(item[metrica])
@@ -1097,6 +1354,13 @@ def render_top_bar(nome, id_agente):
     </div>
     """, unsafe_allow_html=True)
 
+def gerar_link_protocolo(protocolo):
+    if not protocolo: return None
+    s_proto = str(protocolo).strip()
+    if len(s_proto) < 7: suffix = s_proto
+    else: suffix = s_proto[-7:]
+    return f"https://ateltelecom.matrixdobrasil.ai/atendimento/view/cod_atendimento/{suffix}/readonly/true#atendimento-div"
+
 def barra_lateral_com_changelog():
     with st.sidebar:
         st.header("📅 Filtros")
@@ -1109,21 +1373,26 @@ def barra_lateral_com_changelog():
         else: d_ini = st.date_input("Início", hoje-timedelta(1)); d_fim = st.date_input("Fim", hoje)
         st.info(f"De: {d_ini.strftime('%d/%m')} até {d_fim.strftime('%d/%m')}")
         st.markdown("---")
-        with st.expander("📜 Versão Platinum 16.10"):
-            st.markdown("""**v16.10 - Visual Refix**\n- Plantão Cards restaurados.\n- Detratores Ranking OK.\n- Produtividade Líquida.""")
+        with st.expander("📜 Versão Platinum 15.6"):
+            st.markdown("""
+            **v15.6 - Visual Otimizado**
+            - **Pré-Pausas:** Lista ordenada por quantidade em formato 'Sanfona'.
+            - **Plantão:** Cards detalhados com todas as métricas de tempo.
+            - **Monitoramento:** Aviso visual sobre pontualidade em turnos da madrugada.
+            """)
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.auth_status = False; st.session_state.user_data = None; st.rerun()
         return d_ini, d_fim
 
 # ==============================================================================
-# 7. EXECUÇÃO PRINCIPAL
+# 6. EXECUÇÃO
 # ==============================================================================
 
 if "auth_status" not in st.session_state:
     st.session_state.auth_status = False
     st.session_state.user_data = None
     st.session_state.user_role = None
-    st.session_state.user_setor = "NRC"
+    st.session_state.user_setor = "NRC" # Padrão
 
 if not st.session_state.auth_status:
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -1134,19 +1403,33 @@ if not st.session_state.auth_status:
             usuario = st.text_input("E-mail ou Login")
             senha = st.text_input("Senha", type="password")
             submitted = st.form_submit_button("Entrar", use_container_width=True)
+            
             if submitted:
+                # 1. Login Supervisor NRC (Original)
                 if usuario == SUPERVISOR_LOGIN and senha == SUPERVISOR_PASS:
-                    st.session_state.auth_status = True; st.session_state.user_role = "supervisor"; st.session_state.user_setor = "NRC"; st.session_state.user_data = {"nome": "Sup NRC", "id": "SUP"}
+                    st.session_state.auth_status = True
+                    st.session_state.user_role = "supervisor"
+                    st.session_state.user_setor = "NRC"
+                    st.session_state.user_data = {"nome": "Supervisor NRC", "id": "SUPERVISOR"}
                     st.rerun()
-                elif usuario == SUPERVISOR_NEGOCIACAO_LOGIN and senha == SUPERVISOR_NEGOCIACAO_PASS:
-                    st.session_state.auth_status = True; st.session_state.user_role = "supervisor"; st.session_state.user_setor = "NEGOCIACAO"; st.session_state.user_data = {"nome": "Sup Negociação", "id": "SUP_NEG"}
-                    st.rerun()
-                elif usuario == SUPERVISOR_SUPORTE_LOGIN and senha == SUPERVISOR_SUPORTE_PASS:
-                    st.session_state.auth_status = True; st.session_state.user_role = "supervisor"; st.session_state.user_setor = "SUPORTE"; st.session_state.user_data = {"nome": "Sup Suporte", "id": "SUP_SUP"}
-                    st.rerun()
+                
+                # 2. Login Supervisor CANCELAMENTO (Novo)
                 elif usuario == SUPERVISOR_CANCELAMENTO_LOGIN and senha == SUPERVISOR_CANCELAMENTO_PASS:
-                    st.session_state.auth_status = True; st.session_state.user_role = "supervisor"; st.session_state.user_setor = "CANCELAMENTO"; st.session_state.user_data = {"nome": "Sup Cancelamento", "id": "SUP_CANC"}
+                    st.session_state.auth_status = True
+                    st.session_state.user_role = "supervisor"
+                    st.session_state.user_setor = "CANCELAMENTO"
+                    st.session_state.user_data = {"nome": "Supervisor Cancelamento", "id": "SUPERVISOR_CANC"}
                     st.rerun()
+
+                # 3. Login Supervisor SUPORTE (Novo)
+                elif usuario == SUPERVISOR_SUPORTE_LOGIN and senha == SUPERVISOR_SUPORTE_PASS:
+                    st.session_state.auth_status = True
+                    st.session_state.user_role = "supervisor"
+                    st.session_state.user_setor = "SUPORTE"
+                    st.session_state.user_data = {"nome": "Supervisor Suporte", "id": "SUPERVISOR_SUP"}
+                    st.rerun()
+                    
+                # 4. Login Agente (Genérico)
                 else:
                     with st.spinner("Autenticando..."):
                         token = get_admin_token()
@@ -1160,74 +1443,85 @@ else:
     d_inicial, d_final = barra_lateral_com_changelog()
     render_top_bar(st.session_state.user_data['nome'], st.session_state.user_data['id'])
     token = get_admin_token()
+    
+    # Define o setor atual com base no login
     setor_atual = st.session_state.get("user_setor", "NRC")
     
+    # LOGICA DE VISÃO SUPERVISOR (GERAL OU INDIVIDUAL)
     modo_visao_supervisor = "Geral"
-    id_alvo = None; nome_alvo = None
+    id_alvo = None
+    nome_alvo = None
 
     if st.session_state.user_role == "supervisor":
+        # Carrega lista apenas para o selectbox
+        # SE FOR NRC, USA LOGICA ANTIGA. SE FOR OUTRO, USA NOVA.
         with st.spinner("Carregando equipe..."):
             if setor_atual == "NRC":
                 _, _, _, mapa_agentes_sidebar, _ = buscar_dados_completos_supervisor(token, d_inicial, d_final)
-            elif setor_atual == "NEGOCIACAO":
-                mapa_completo = mapear_todos_agentes(token)
-                nomes_alvo = [x.strip().upper() for x in SETORES_AGENTES["NEGOCIACAO"]]
-                mapa_agentes_sidebar = {}
-                for nome in nomes_alvo:
-                    if nome in mapa_completo: mapa_agentes_sidebar[mapa_completo[nome]] = nome
-                    else: 
-                        for n, c in mapa_completo.items():
-                            if nome in n.split():
-                                if nome in NOMES_COMUNS_PRIMEIRO and nome == n.split()[0]: mapa_agentes_sidebar[c] = n; break
-                                else: mapa_agentes_sidebar[c] = n; break
             else:
                 _, _, _, mapa_agentes_sidebar, _ = buscar_dados_supervisor_multisetor(token, d_inicial, d_final, setor_atual)
         
         st.sidebar.markdown("---")
+        st.sidebar.header("👤 Visão Individual")
         lista_nomes = ["Visão Geral"] + sorted(list(mapa_agentes_sidebar.values()))
         opcao_agente = st.sidebar.selectbox("Selecionar Agente", lista_nomes)
+        
         if opcao_agente != "Visão Geral":
             modo_visao_supervisor = "Individual"
             for cod, nome in mapa_agentes_sidebar.items():
-                if nome == opcao_agente: id_alvo = cod; nome_alvo = nome; break
+                if nome == opcao_agente:
+                    id_alvo = cod; nome_alvo = nome; break
     
-    # --- PAINEL INDIVIDUAL (AGENTE OU ESPIÃO) ---
+    # --------------------------------------------------------------------------
+    # PAINEL AGENTE / VISÃO INDIVIDUAL
+    # --------------------------------------------------------------------------
     if st.session_state.user_role == "agente" or (st.session_state.user_role == "supervisor" and modo_visao_supervisor == "Individual"):
+        
         if st.session_state.user_role == "agente":
-            target_id = st.session_state.user_data['id']; target_name = st.session_state.user_data['nome']
+            target_id = st.session_state.user_data['id']
+            target_name = st.session_state.user_data['nome']
         else:
-            target_id = id_alvo; target_name = nome_alvo
-            st.warning(f"👁️‍🗨️ MODO ESPIÃO: {target_name}")
+            target_id = id_alvo
+            target_name = nome_alvo
+            st.warning(f"👁️‍🗨️ MODO ESPIÃO: Visualizando painel de **{target_name}**")
 
+        st.markdown(f"### 👋 Bem-vindo, {target_name}")
         abas = st.tabs(["📊 Visão Geral", "⏸️ Pausas", "⭐ Qualidade", "🆘 Suporte"])
+        
         with abas[0]:
             if token:
                 dt_obj, texto_login, df_logins = buscar_historico_login(token, target_id, d_inicial, d_final)
-                stats = buscar_estatisticas_agente(token, target_id, d_inicial, d_final)
-                csat, csat_qtd, df_csat = buscar_csat_nrc(token, target_id, d_inicial, d_final)
+                stats_data = buscar_estatisticas_agente(token, target_id, d_inicial, d_final)
+                val_qtd = stats_data.get('num_qtd', '0') if stats_data else '0'
+                val_tma = stats_data.get('tma', '--:--') if stats_data else '--:--'
+                val_tmia = stats_data.get('tmia', '--:--') if stats_data else '--:--'
+                val_tmic = stats_data.get('tmic', '--:--') if stats_data else '--:--'
+                val_tme = stats_data.get('tme', '--:--') if stats_data else '--:--'
+                csat_score, csat_qtd, df_csat = buscar_csat_nrc(token, target_id, d_inicial, d_final)
                 
                 c1, c2, c3 = st.columns(3)
-                with c1: 
+                with c1:
                     cor = "#10b981" if dt_obj and dt_obj.date() == datetime.now().date() else "#3b82f6"
                     sub = f"Data: {dt_obj.strftime('%d/%m')}" if dt_obj else "Sem registro"
                     render_kpi_card("Primeiro Login", texto_login, sub, cor)
-                with c2: render_kpi_card("Volume Total", str(stats.get('num_qtd', '0') if stats else '0'), "Atendimentos Finalizados", "#8b5cf6")
+                with c2: render_kpi_card("Volume Total", str(val_qtd), "Atendimentos Finalizados", "#8b5cf6")
                 with c3:
-                    cor_csat = "#10b981" if csat >= 85 else "#f59e0b"
-                    render_kpi_card("CSAT (Qualidade)", f"{csat:.2f}%", f"Base: {csat_qtd} avaliações", cor_csat)
+                    cor_csat = "#10b981" if csat_score >= 85 else "#f59e0b"
+                    render_kpi_card("CSAT (Qualidade)", f"{csat_score:.2f}%", f"Base: {csat_qtd} avaliações", cor_csat)
                 
                 c4, c5, c6 = st.columns(3)
-                with c4: render_kpi_card("T.M.A", str(stats.get('tma', '--:--') if stats else '--:--'), "Tempo Médio Atendimento", "#f59e0b")
-                with c5: render_kpi_card("T.M.I.A", str(stats.get('tmia', '--:--') if stats else '--:--'), "Inatividade Agente", "#10b981")
-                with c6: render_kpi_card("T.M.I.C", str(stats.get('tmic', '--:--') if stats else '--:--'), "Inatividade Cliente", "#3b82f6")
+                with c4: render_kpi_card("T.M.A", val_tma, "Tempo Médio Atendimento", "#f59e0b")
+                with c5: render_kpi_card("T.M.I.A", val_tmia, "Inatividade Agente", "#10b981")
+                with c6: render_kpi_card("T.M.I.C", val_tmic, "Inatividade Cliente", "#3b82f6")
                 
                 st.markdown("---")
                 c7, c8, c9 = st.columns(3)
-                with c7: render_kpi_card("T.M.E", str(stats.get('tme', '--:--') if stats else '--:--'), "Tempo Médio Espera", "#ef4444")
+                with c7: render_kpi_card("T.M.E", val_tme, "Tempo Médio Espera", "#ef4444")
                 st.markdown("---")
                 
                 if not df_logins.empty:
                     with st.expander("📅 Ver Histórico de Entradas Detalhado", expanded=False): st.dataframe(df_logins, use_container_width=True, hide_index=True)
+            else: st.error("Sem conexão API.")
 
         with abas[1]:
             if token:
@@ -1272,14 +1566,13 @@ else:
 
         with abas[2]:
             if df_csat is not None and not df_csat.empty:
-                cor_csat = "#10b981" if csat >= 85 else "#f59e0b"
-                render_kpi_card("Seu CSAT no Período", f"{csat:.2f}%", f"{csat_qtd} avaliações", cor_csat)
+                cor_csat = "#10b981" if csat_score >= 85 else "#f59e0b"
+                render_kpi_card("Seu CSAT no Período", f"{csat_score:.2f}%", f"{csat_qtd} avaliações", cor_csat)
                 st.markdown("---")
                 st.markdown("#### 📋 Histórico de Avaliações")
                 df_csat['Acesso'] = df_csat['Protocolo'].apply(gerar_link_protocolo)
                 st.dataframe(df_csat[['Data', 'Cliente', 'Nota', 'Comentario', 'Acesso']], column_config={"Acesso": st.column_config.LinkColumn("Link", display_text="Abrir Atendimento"), "Nota": st.column_config.NumberColumn("Nota", format="%d ⭐")}, use_container_width=True, hide_index=True)
                 
-                # FIXED: Nota_Num column is guaranteed now
                 detratores = df_csat[df_csat['Nota_Num'] < 7].copy()
                 st.markdown("<br>", unsafe_allow_html=True)
                 with st.expander(f"🔻 Ranking de Detratores ({len(detratores)})", expanded=False):
@@ -1302,39 +1595,48 @@ else:
                         if sucesso: st.success("✅ " + retorno)
                         else: st.error(retorno)
 
-    # --- PAINEL GERAL SUPERVISOR ---
+    # --------------------------------------------------------------------------
+    # PAINEL SUPERVISOR GERAL (ADAPTADO PARA MULTISETOR)
+    # --------------------------------------------------------------------------
     elif st.session_state.user_role == "supervisor" and modo_visao_supervisor == "Geral":
         st.markdown(f"## 🏢 Painel de Gestão - Setor {setor_atual}")
-        lista_abas = ["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações", "🚀 Produtividade (Em Andamento)"]
-        if setor_atual == "SUPORTE": lista_abas.extend(["🌙 Plantão", "🏢 Cliente Interno"])
-        elif setor_atual == "NEGOCIACAO": lista_abas.extend(["📊 Auditoria"])
         
+        # Definição das abas (Condicional para SUPORTE)
+        lista_abas = ["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações"]
+        if setor_atual == "SUPORTE":
+            lista_abas.extend(["🌙 Plantão", "🏢 Cliente Interno"])
+            
         abas_sup = st.tabs(lista_abas)
         
-        # 1. Visão Geral
+        # ABA 1: VISÃO GERAL
         with abas_sup[0]:
             if token:
                 with st.spinner("Sincronizando estatísticas..."):
+                    
                     if setor_atual == "NRC":
+                        # LÓGICA ORIGINAL INTACTA PARA NRC
                         dados_servicos, csat_geral, base_geral, mapa_agentes, dados_globais = buscar_dados_completos_supervisor(token, d_inicial, d_final)
                         lista_servicos_exibir = SERVICOS_ALVO
-                    elif setor_atual == "NEGOCIACAO":
-                        dados_servicos, csat_geral, base_geral, dados_globais = buscar_dados_negociacao_multiconta(token, d_inicial, d_final)
-                        _, _, _, mapa_agentes, _ = buscar_dados_supervisor_multisetor(token, d_inicial, d_final, setor_atual)
-                        lista_servicos_exibir = SETORES_SERVICOS.get(setor_atual, [])
                     else:
+                        # LÓGICA NOVA PARA OUTROS SETORES (INCLUINDO SUPORTE)
                         dados_servicos, csat_geral, base_geral, mapa_agentes, dados_globais = buscar_dados_supervisor_multisetor(token, d_inicial, d_final, setor_atual)
                         lista_servicos_exibir = SETORES_SERVICOS.get(setor_atual, [])
 
                     st.markdown(f"#### ⭐ Visão Global da Equipe ({setor_atual})")
+                    
+                    # LINHA 1: CSAT + Cards Especiais
                     col_kpi1, col_kpi2 = st.columns([1, 2])
                     with col_kpi1:
                         cor_geral = "#10b981" if csat_geral >= 85 else ("#f59e0b" if csat_geral >= 75 else "#ef4444")
                         render_kpi_card("CSAT Global (Setor)", f"{csat_geral:.2f}%", f"Base Total: {base_geral}", cor_geral)
                     with col_kpi2:
-                        if setor_atual == "NRC": render_link_card("Ferramenta Externa", "https://fideliza-nator-live.streamlit.app/", "FIDELIZA-NATOR")
-                        elif setor_atual == "CANCELAMENTO": render_link_card("Acesso Rápido", "https://docs.google.com/spreadsheets/d/1y-7_w8RuzE2SSWatbdZj0SjsIa-aJyZCV0_1OxwD7bs/edit?gid=0#gid=0", "CLIENTE CRITICO", cor_borda="#ef4444")
+                        if setor_atual == "NRC":
+                            render_link_card("Ferramenta Externa", "https://fideliza-nator-live.streamlit.app/", "FIDELIZA-NATOR")
+                        elif setor_atual == "CANCELAMENTO":
+                            render_link_card("Acesso Rápido", "https://docs.google.com/spreadsheets/d/1y-7_w8RuzE2SSWatbdZj0SjsIa-aJyZCV0_1OxwD7bs/edit?gid=0#gid=0", "CLIENTE CRITICO", cor_borda="#ef4444")
+                        # SUPORTE não exibe card aqui
 
+                    # LINHA 2: CARDS DE TEMPO GLOBAIS
                     st.markdown("<br>", unsafe_allow_html=True)
                     c_g1, c_g2, c_g3, c_g4 = st.columns(4)
                     with c_g1: render_kpi_card("T.M.A (Global)", dados_globais["tma"], "Tempo Médio Atend.", "#3b82f6")
@@ -1343,15 +1645,23 @@ else:
                     with c_g4: render_kpi_card("T.M.I.C (Global)", dados_globais["tmic"], "Inativ. Cliente", "#6366f1")
 
                     st.markdown("---")
+                    
                     for servico in lista_servicos_exibir:
                         dado = dados_servicos.get(servico, {})
                         st.markdown(f"<div class='service-header'>{servico}</div>", unsafe_allow_html=True)
-                        total_s = dado.get("csat_total", 0); pos_s = dado.get("csat_pos", 0)
+                        
+                        total_s = dado.get("csat_total", 0)
+                        pos_s = dado.get("csat_pos", 0)
                         score_s = (pos_s / total_s * 100) if total_s > 0 else 0.0
+                        
+                        # LAYOUT EXPANDIDO (6 CARDS)
                         col1, col2, col3, col4, col5, col6 = st.columns(6)
+                        
                         with col1: render_kpi_card("Volume", str(dado.get("num_qtd", 0)), "Atendimentos", "#8b5cf6")
+                        
                         cor_s = "#10b981" if score_s >= 85 else ("#f59e0b" if score_s >= 75 else "#ef4444")
                         with col2: render_kpi_card("Satisfação", f"{score_s:.2f}%", f"Base: {total_s}", cor_s)
+                        
                         with col3: render_kpi_card("T.M.A", str(dado.get("tma", "--:--")), "Tempo Médio", "#3b82f6")
                         with col4: render_kpi_card("T.M.E", str(dado.get("tme", "--:--")), "Fila/Espera", "#ef4444")
                         with col5: render_kpi_card("T.M.I.A", str(dado.get("tmia", "--:--")), "Inatividade Agt", "#f59e0b")
@@ -1359,27 +1669,34 @@ else:
         
         # ABA 2: RANKINGS
         with abas_sup[1]:
-            if token and 'mapa_agentes_sidebar' in locals():
+            if token and 'mapa_agentes' in locals():
                 with st.spinner("Calculando o MVP do Mês..."):
-                    contas_rank = CONTAS_NEGOCIACAO if setor_atual == "NEGOCIACAO" else [ID_CONTA]
-                    lista_rank = processar_ranking_geral(token, d_inicial, d_final, mapa_agentes_sidebar, contas_rank)
+                    lista_rank = processar_ranking_geral(token, d_inicial, d_final, mapa_agentes)
+                    
                     if lista_rank:
                         df_rank = pd.DataFrame(lista_rank)
                         mvp_nome = eleger_melhor_do_mes(df_rank)
+                        
                         if mvp_nome:
                             st.markdown(f"""<div class="mvp-card"><div style="font-size: 1rem; opacity: 0.8; text-transform: uppercase;">⭐ Destaque do Período ⭐</div><div style="font-size: 2.5rem; font-weight: 800; margin: 10px 0;">{mvp_nome}</div><div style="font-size: 0.9rem;">Melhor equilíbrio entre TMA, TMIA e Satisfação</div></div>""", unsafe_allow_html=True)
+
                         st.markdown("### 🚀 Top Produtividade (Volume)")
                         render_podium("Campeões de Volume", lista_rank, "Volume", "")
+                        
                         st.markdown("---")
+                        
                         st.markdown("### ⭐ Top Qualidade (CSAT)")
                         render_podium("Campeões de Nota", lista_rank, "CSAT Score", "%")
+                        
                         st.markdown("---")
+                        
                         st.markdown("#### 📊 Tabela Geral de Desempenho (Todos os Tempos)")
                         df_display = df_rank[['Agente', 'Volume', 'TMA', 'TME', 'TMIA', 'TMIC', 'CSAT Score', 'CSAT Qtd']].sort_values(by="Volume", ascending=False)
                         st.dataframe(df_display, column_config={"CSAT Score": st.column_config.NumberColumn("CSAT Score", format="%.2f%%")}, use_container_width=True, hide_index=True)
-                        
+
                         st.markdown("---")
                         st.error("🔻 Pontos de Atenção (Detratores)")
+                        
                         c_d1, c_d2, c_d3 = st.columns(3)
                         with c_d1:
                             st.markdown("**Menores Notas (CSAT)**")
@@ -1390,13 +1707,14 @@ else:
                         with c_d3:
                             st.markdown("**Maior Ociosidade (TMIA)**")
                             render_podium("Mais Ociosos", lista_rank, "TMIA", "", inverso=True)
+
                     else: st.warning("Sem dados suficientes para gerar ranking.")
             else: st.info("Aguarde o carregamento da Visão Geral.")
 
         # ABA 3: PAUSAS
         with abas_sup[2]:
-            if token and 'mapa_agentes_sidebar' in locals():
-                lista_curtas, lista_almoco, lista_logins, lista_ranking = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes_sidebar, setor_atual)
+            if token and 'mapa_agentes' in locals():
+                lista_curtas, lista_almoco, lista_logins, lista_ranking = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes)
                 c_p1, c_p2 = st.columns(2)
                 with c_p1:
                     st.subheader("1. 🚨 Risco de Estouro (Manhã/Tarde)")
@@ -1405,146 +1723,188 @@ else:
                         st.dataframe(df_c[['Agente', 'Excesso Acumulado', 'Status']], use_container_width=True, hide_index=True)
                     else: st.success("Ninguém estourou!")
                 with c_p2:
-                    st.subheader("2. 🍽️ Almoço/Jantar (Detecção)")
+                    st.subheader("2. 🍽️ Atrasos de Almoço")
                     if lista_almoco:
                         st.dataframe(pd.DataFrame(lista_almoco), use_container_width=True, hide_index=True)
-                    else: st.info("Nenhum intervalo detectado ou não aplicável ao setor.")
+                    else: st.success("Sem atrasos.")
                 st.markdown("---")
                 c_p3, c_p4 = st.columns(2)
                 with c_p3:
                     st.subheader("3. ⏰ Pontualidade (Logins)")
                     if lista_logins:
                         st.dataframe(pd.DataFrame(lista_logins).sort_values(by="Data", ascending=False), use_container_width=True, hide_index=True)
+                        st.caption("ℹ️ Nota: Turnos que iniciam no dia anterior (madrugada) podem apresentar falsos atrasos aqui.")
                     else: st.success("Todos pontuais!")
                 with c_p4:
                     st.subheader("4. 🏆 Ranking Pausas (Qtd)")
                     if lista_ranking:
                         st.dataframe(pd.DataFrame(lista_ranking).sort_values(by="Qtd Pausas", ascending=False), use_container_width=True, hide_index=True)
+                
+                # SEÇÃO DE PRÉ-PAUSAS (SANFONA)
                 st.markdown("---")
                 st.subheader("5. ⏳ Monitoramento de Pré-Pausas (Agendadas)")
                 with st.spinner("Buscando pré-pausas..."):
-                    mapa_pre = processar_dados_pre_pausas_geral(token, d_inicial, d_final, mapa_agentes_sidebar)
-                    if mapa_pre:
-                        agentes_ord = sorted(mapa_pre.keys(), key=lambda x: len(mapa_pre[x]), reverse=True)
-                        for ag in agentes_ord:
-                            qtd = len(mapa_pre[ag])
-                            lista_p = mapa_pre[ag]
-                            with st.expander(f"➕ {ag} ({qtd} pré-pausas)"):
-                                df_pre = pd.DataFrame(lista_p)
-                                st.dataframe(df_pre, use_container_width=True, hide_index=True)
-                    else: st.info("Nenhuma pré-pausa registrada no período.")
+                    lista_pre_pausas = processar_dados_pre_pausas_geral(token, d_inicial, d_final, mapa_agentes)
+                    if lista_pre_pausas:
+                        df_pre = pd.DataFrame(lista_pre_pausas)
+                        # Ordenar agentes por quantidade decrescente
+                        contagem = df_pre['Agente'].value_counts()
+                        agentes_ordenados = contagem.index.tolist()
+                        
+                        for agente in agentes_ordenados:
+                            qtd = contagem[agente]
+                            # Filtra as pausas deste agente
+                            df_filtrado = df_pre[df_pre['Agente'] == agente].sort_values(by="Início", ascending=False)
+                            
+                            with st.expander(f"➕ {agente} ({qtd} pré-pausas)"):
+                                st.dataframe(df_filtrado[['Início', 'Término', 'Duração', 'Motivo']], use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Nenhuma pré-pausa registrada no período.")
+
             else: st.info("Aguarde o carregamento da Visão Geral.")
             
         # ABA 4: TEMPO REAL
         with abas_sup[3]:
             if token:
                 if st.button("🔄 Atualizar Lista Online"): st.rerun()
-                if setor_atual == "NRC": lista_online = buscar_agentes_online_filtrado_nrc(token)
-                else: lista_online = buscar_agentes_online_filtrado_setor(token, setor_atual)
+                
+                # Seleção da função correta baseada no setor
+                if setor_atual == "NRC":
+                    lista_online = buscar_agentes_online_filtrado_nrc(token)
+                else:
+                    lista_online = buscar_agentes_online_filtrado_setor(token, setor_atual)
+                
                 if lista_online:
                     st.markdown(f"### 🟢 {len(lista_online)} Agentes Online ({setor_atual})")
+                    
                     for agente_online in lista_online:
                         aid = agente_online.get("cod")
                         nome_online = agente_online.get("nom_agente", "Desconhecido")
                         status_online = agente_online.get("status", "Online")
                         tempo_online = agente_online.get("tempo_status", "--:--")
-                        cor_status_online = "#10b981" if "Pausa" not in status_online else "#f59e0b"
-                        st.markdown(f"""<div class="realtime-card"><div style="flex:1;"><div style="font-weight:bold; color:white; font-size:1.1rem;">{nome_online}</div><div style="color:#9ca3af; font-size:0.8rem;">ID: {aid}</div></div><div style="flex:1; text-align:center;"><span style="background-color:{cor_status_online}; color:black; padding:2px 10px; border-radius:12px; font-weight:bold; font-size:0.8rem;">{status_online}</span><div style="margin-top:5px; color:#e5e7eb; font-family:monospace;">⏱ {tempo_online}</div></div><div style="flex:1; text-align:right;"></div></div>""", unsafe_allow_html=True)
+                        
+                        cor_status_online = "#10b981" # Verde
+                        if "Pausa" in status_online: cor_status_online = "#f59e0b"
+                        
+                        st.markdown(f"""
+                        <div class="realtime-card">
+                            <div style="flex:1;">
+                                <div style="font-weight:bold; color:white; font-size:1.1rem;">{nome_online}</div>
+                                <div style="color:#9ca3af; font-size:0.8rem;">ID: {aid}</div>
+                            </div>
+                            <div style="flex:1; text-align:center;">
+                                <span style="background-color:{cor_status_online}; color:black; padding:2px 10px; border-radius:12px; font-weight:bold; font-size:0.8rem;">{status_online}</span>
+                                <div style="margin-top:5px; color:#e5e7eb; font-family:monospace;">⏱ {tempo_online}</div>
+                            </div>
+                            <div style="flex:1; text-align:right;">
+                                </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Botão de Ação (Streamlit)
                         col_btn = st.columns([4, 1])[1]
                         with col_btn:
                             if st.button("🔴 Deslogar", key=f"btn_logout_{aid}"):
                                 with st.spinner(f"Deslogando {nome_online}..."):
                                     sucesso_logout, msg_logout = forcar_logout(token, aid)
-                                    if sucesso_logout: st.success(f"{nome_online} deslogado!"); time.sleep(1); st.rerun()
+                                    if sucesso_logout: 
+                                        st.success(f"{nome_online} deslogado!")
+                                        time.sleep(1)
+                                        st.rerun()
                                     else: st.error(msg_logout)
-                else: st.warning(f"Nenhum agente da equipe {setor_atual} está online no momento.")
+                else:
+                    st.warning(f"Nenhum agente da equipe {setor_atual} está online no momento.")
             else: st.error("Erro de conexão.")
 
         # ABA 5: SOLICITAÇÕES
         with abas_sup[4]:
             st.info("Visualização das solicitações registradas no Google Sheets.")
             df_gsheets = ler_solicitacoes_gsheets()
-            if not df_gsheets.empty: st.dataframe(df_gsheets, use_container_width=True)
+            if not df_gsheets.empty:
+                st.dataframe(df_gsheets, use_container_width=True)
             else: st.warning("Nenhuma solicitação encontrada na planilha.")
-
-        # 6. NOVA ABA: PRODUTIVIDADE
-        with abas_sup[5]:
-            if token:
-                with st.spinner("Calculando produtividade líquida..."):
-                    lista_prod = processar_produtividade_geral(token, d_inicial, d_final, setor_atual)
-                    st.subheader(f"🚀 Produtividade Líquida (Meta 07h30/dia)")
-                    st.markdown("Cálculo: **(Dias Trabalhados × 7.5h) - (Tempo Logado - Tempo Pausado)**")
-                    if lista_prod:
-                        df_prod = pd.DataFrame(lista_prod).sort_values("_sort", ascending=False)
-                        st.dataframe(df_prod.drop(columns=["_sort"]), column_config={"Líquido Real": st.column_config.TextColumn("Realizado", help="Logado - Pausas"), "Saldo": st.column_config.TextColumn("Saldo", help="Diferença para a Meta")}, use_container_width=True, hide_index=True)
-                    else: st.warning("Sem dados de produtividade para o período.")
 
         # ABA 6: PLANTÃO (ESPECÍFICO SUPORTE)
         if setor_atual == "SUPORTE":
-            with abas_sup[6]:
+            with abas_sup[5]:
                 if token:
                     with st.spinner("Carregando dados do Plantão..."):
                         df_plantao, stats_servico_plantao, _ = buscar_dados_plantao(token, d_inicial, d_final)
+                        
                         st.markdown("### 🌙 Equipe de Plantão (Madrugada)")
+                        
                         if not df_plantao.empty:
+                            # 1. Tabela com Satisfação
                             st.dataframe(df_plantao, column_config={"CSAT": st.column_config.NumberColumn("CSAT (%)", format="%.2f%%")}, use_container_width=True, hide_index=True)
+                            
+                            # 2. Resumo Geral
                             total_vol_plantao = df_plantao['Volume'].sum()
                             st.markdown(f"**Volume Total Plantão:** {total_vol_plantao} atendimentos")
+                            
                             st.markdown("---")
                             st.markdown("#### 📊 Métricas por Setor (Plantão)")
+                            
+                            # 3. Cards Detalhados
                             if len(stats_servico_plantao) > 0:
                                 cols_plantao = st.columns(len(stats_servico_plantao))
                                 for i, (servico, dados) in enumerate(stats_servico_plantao.items()):
                                     with cols_plantao[i % len(cols_plantao)]:
-                                        # VISUAL FIX: Usando render_kpi_card
-                                        render_kpi_card(servico, str(dados["num_qtd"]), f"TMA: {dados['tma']} | TME: {dados['tme']}", "#8b5cf6")
-                        else: st.warning("Sem dados para a equipe de plantão neste período.")
-            
-            with abas_sup[7]:
+                                        st.markdown(f"**{servico}**")
+                                        st.metric("Volume", dados["num_qtd"])
+                                        st.caption(f"TMA: {dados['tma']} | TME: {dados['tme']}")
+                                        st.caption(f"TMIA: {dados['tmia']} | TMIC: {dados['tmic']}")
+                        else:
+                            st.warning("Sem dados para a equipe de plantão neste período.")
+
+        # ABA 7: CLIENTE INTERNO (ESPECÍFICO SUPORTE - CONTA 5)
+        if setor_atual == "SUPORTE":
+            with abas_sup[6]:
                 if token:
+                    # Passa a lista de nomes do SUPORTE para filtrar
                     nomes_suporte = SETORES_AGENTES["SUPORTE"]
                     with st.spinner("Conectando à Conta 5 (Cliente Interno)..."):
                         stats_ci, score_ci, total_ci, df_ci = buscar_dados_cliente_interno(token, d_inicial, d_final, nomes_suporte)
+                        
                         st.markdown("### 🏢 Cliente Interno (Conta 5)")
+                        
+                        # Cards de Tempo e Satisfação
                         c1, c2, c3, c4 = st.columns(4)
                         cor_ci = "#10b981" if score_ci >= 85 else "#f59e0b"
                         with c1: render_kpi_card("CSAT Interno", f"{score_ci:.2f}%", f"Base: {total_ci}", cor_ci)
                         with c2: render_kpi_card("T.M.A", stats_ci["TMA"], "Tempo Médio", "#3b82f6")
                         with c3: render_kpi_card("T.M.E", stats_ci["TME"], "Espera", "#ef4444")
                         with c4: render_kpi_card("T.M.I.A", stats_ci["TMIA"], "Inatividade", "#f59e0b")
+                        
                         st.markdown("---")
+                        
+                        # Tabela de Detalhes
                         if not df_ci.empty:
                             st.markdown("#### 📋 Histórico de Chamados Internos (Filtrado: Equipe Suporte)")
                             df_ci['Acesso'] = df_ci['Protocolo'].apply(gerar_link_protocolo)
-                            st.dataframe(df_ci[['Data', 'Agente', 'Cliente', 'Nota', 'Comentario', 'Acesso']], column_config={"Acesso": st.column_config.LinkColumn("Link", display_text="Abrir"), "Nota": st.column_config.NumberColumn("Nota", format="%d ⭐")}, use_container_width=True, hide_index=True)
                             
-                            # Fixed Key Error on Nota Num
-                            detratores_ci = df_ci[df_ci['Nota_Num'] < 7].copy() if 'Nota_Num' in df_ci.columns else pd.DataFrame()
+                            # Tabela Principal
+                            st.dataframe(
+                                df_ci[['Data', 'Agente', 'Cliente', 'Nota', 'Comentario', 'Acesso']], 
+                                column_config={
+                                    "Acesso": st.column_config.LinkColumn("Link", display_text="Abrir"),
+                                    "Nota": st.column_config.NumberColumn("Nota", format="%d ⭐")
+                                }, 
+                                use_container_width=True, hide_index=True
+                            )
+                            
+                            # Ranking de Detratores Internos
+                            detratores_ci = df_ci[df_ci['Nota'] < 7].copy()
                             st.markdown("<br>", unsafe_allow_html=True)
                             with st.expander(f"🔻 Detratores Internos ({len(detratores_ci)})", expanded=True):
-                                if not detratores_ci.empty: st.dataframe(detratores_ci[['Data', 'Agente', 'Cliente', 'Nota', 'Comentario', 'Acesso']], column_config={"Acesso": st.column_config.LinkColumn("Link", display_text="Verificar"), "Nota": st.column_config.NumberColumn("Nota", format="%d 🔴")}, use_container_width=True, hide_index=True)
+                                if not detratores_ci.empty:
+                                    st.dataframe(
+                                        detratores_ci[['Data', 'Agente', 'Cliente', 'Nota', 'Comentario', 'Acesso']], 
+                                        column_config={
+                                            "Acesso": st.column_config.LinkColumn("Link", display_text="Verificar"),
+                                            "Nota": st.column_config.NumberColumn("Nota", format="%d 🔴")
+                                        }, 
+                                        use_container_width=True, hide_index=True
+                                    )
                                 else: st.success("Nenhum detrator interno no período!")
-                        else: st.info("Nenhum chamado de cliente interno atendido pela equipe de Suporte no período.")
-
-        # ABA 9: AUDITORIA (ESPECÍFICO NEGOCIAÇÃO)
-        if setor_atual == "NEGOCIACAO":
-            with abas_sup[6]:
-                if token:
-                    with st.spinner("Auditando volumetria por origem (Contas 1 e 14)..."):
-                        lista_agentes_neg = SETORES_AGENTES["NEGOCIACAO"]
-                        dados_auditoria = buscar_auditoria_volumetria(token, d_inicial, d_final, lista_agentes_neg)
-                        st.markdown("### 📊 Auditoria de Volumetria (Ativo vs Passivo)")
-                        st.caption("ℹ️ Nota: A contagem abaixo exclui atendimentos do Canal Voz e soma os dados das Contas 1 e 14.")
-                        if dados_auditoria:
-                            dados_auditoria.sort(key=lambda x: x["Total"], reverse=True)
-                            for item in dados_auditoria:
-                                nome = item["Agente"]
-                                total = item["Total"]
-                                ativo = item["Ativo"]; passivo = item["Passivo"]
-                                perc_ativo = (ativo/total*100) if total > 0 else 0
-                                perc_passivo = (passivo/total*100) if total > 0 else 0
-                                with st.expander(f"👤 {nome} - Volume Total: {total}"):
-                                    c_a1, c_a2 = st.columns(2)
-                                    with c_a1: st.metric("Negociação ATIVA", ativo, f"{perc_ativo:.1f}%")
-                                    with c_a2: st.metric("Negociação PASSIVA", passivo, f"{perc_passivo:.1f}%")
-                        else: st.info("Sem dados de volumetria para auditoria.")
+                        else:
+                            st.info("Nenhum chamado de cliente interno atendido pela equipe de Suporte no período.")
