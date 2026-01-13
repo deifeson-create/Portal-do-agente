@@ -184,6 +184,24 @@ def conectar_gsheets():
     except Exception as erro:
         return None
 
+def conectar_gsheets_aba(nome_aba):
+    """
+    Conecta a uma aba específica da planilha Google Sheets.
+    Usado para o Diário de Bordo (aba Feedback_Gestao).
+    """
+    try:
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        # Abre a planilha pelo nome do arquivo principal
+        spreadsheet = client.open("solicitacoes_nrc")
+        # Seleciona a aba específica
+        worksheet = spreadsheet.worksheet(nome_aba)
+        return worksheet
+    except Exception as erro:
+        return None
+
 def salvar_solicitacao_gsheets(nome_agente, id_agente, motivo, mensagem):
     sheet = conectar_gsheets()
     if sheet:
@@ -197,12 +215,49 @@ def salvar_solicitacao_gsheets(nome_agente, id_agente, motivo, mensagem):
     else:
         return False, "Erro de conexão com Google Sheets. Verifique o compartilhamento."
 
+def salvar_diario_bordo(supervisor_nome, setor_atual, nome_agente, tipo_ponto, descricao):
+    """
+    Salva o feedback do supervisor na aba Feedback_Gestao.
+    """
+    sheet = conectar_gsheets_aba("Feedback_Gestao")
+    if sheet:
+        data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        try:
+            # Colunas esperadas na aba Feedback_Gestao:
+            # A: Data | B: Supervisor | C: Setor | D: Agente | E: Tipo | F: Descrição | G: Validação Gestão
+            sheet.append_row([data_hora, supervisor_nome, setor_atual, nome_agente, tipo_ponto, descricao, "Pendente"])
+            return True, "Registro salvo no Diário de Bordo!"
+        except Exception as erro:
+            return False, f"Erro ao salvar no Diário de Bordo: {erro}"
+    else:
+        return False, "Erro: Aba 'Feedback_Gestao' não encontrada na planilha."
+
 def ler_solicitacoes_gsheets():
     sheet = conectar_gsheets()
     if sheet:
         try:
             data = sheet.get_all_records()
             return pd.DataFrame(data)
+        except:
+            return pd.DataFrame()
+    return pd.DataFrame()
+
+def ler_diario_bordo(setor_filtro=None):
+    """
+    Lê os registros do Diário de Bordo para exibir ao supervisor.
+    Filtra pelo setor se necessário.
+    """
+    sheet = conectar_gsheets_aba("Feedback_Gestao")
+    if sheet:
+        try:
+            data = sheet.get_all_records()
+            df = pd.DataFrame(data)
+            if not df.empty and setor_filtro:
+                # Filtra apenas os registros do setor do supervisor logado
+                # Assume que a coluna se chama 'Setor' no Google Sheets
+                if 'Setor' in df.columns:
+                    df = df[df['Setor'] == setor_filtro]
+            return df
         except:
             return pd.DataFrame()
     return pd.DataFrame()
@@ -666,8 +721,8 @@ def _processar_agente_pausas(token, cod_agente, nome_agente, data_ini, data_fim)
         
     for d, dt in min_logins.items():
         mins = dt.minute
-        # Regra Pontualidade: 02 a 40 = Atraso.
-        if 1 < mins <= 40:
+        # Regra Pontualidade: 02 a 55 = Atraso (Ajustado conforme solicitação).
+        if 1 < mins <= 55:
             local_logins.append({
                 "Agente": nome_agente,
                 "Data": d,
@@ -1602,7 +1657,7 @@ else:
         st.markdown(f"## 🏢 Painel de Gestão - Setor {setor_atual}")
         
         # Definição das abas (Condicional para SUPORTE)
-        lista_abas = ["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações"]
+        lista_abas = ["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações", "📝 Diário de Bordo"]
         if setor_atual == "SUPORTE":
             lista_abas.extend(["🌙 Plantão", "🏢 Cliente Interno"])
             
@@ -1824,9 +1879,110 @@ else:
                 st.dataframe(df_gsheets, use_container_width=True)
             else: st.warning("Nenhuma solicitação encontrada na planilha.")
 
-        # ABA 6: PLANTÃO (ESPECÍFICO SUPORTE)
+        # ABA 6: DIÁRIO DE BORDO (NOVA)
+        with abas_sup[5]:
+            st.markdown("### 📝 Diário de Bordo da Supervisão")
+            st.info("Utilize este espaço para registrar ocorrências semanais, advertências, elogios e feedbacks da equipe.")
+            
+            # --- FORMULÁRIO ---
+            with st.form("form_diario_bordo"):
+                # Lista de agentes para o supervisor selecionar
+                lista_agentes_diario = ["Geral (Equipe)"] + sorted(list(mapa_agentes.values())) if 'mapa_agentes' in locals() else ["Geral (Equipe)"]
+                
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    agente_selecionado = st.selectbox("Agente Relacionado", lista_agentes_diario)
+                with col_d2:
+                    tipo_ponto = st.selectbox("Tipo de Registro", [
+                        "Advertência", 
+                        "Atestado/Falta", 
+                        "Feedback Comportamental", 
+                        "Feedback Técnico", 
+                        "Elogio/Destaque", 
+                        "Problema Sistêmico", 
+                        "Outros"
+                    ])
+                
+                texto_diario = st.text_area("Descrição detalhada do ponto:", height=120, placeholder="Descreva o ocorrido, a tratativa realizada e o resultado esperado...")
+                
+                btn_diario = st.form_submit_button("💾 Registrar no Diário", use_container_width=True)
+                
+                if btn_diario:
+                    if texto_diario:
+                        with st.spinner("Salvando registro..."):
+                            supervisor_logado = st.session_state.user_data['nome']
+                            sucesso_db, msg_db = salvar_diario_bordo(supervisor_logado, setor_atual, agente_selecionado, tipo_ponto, texto_diario)
+                            if sucesso_db:
+                                st.success(msg_db)
+                                time.sleep(1) # Pequeno delay para garantir o reload
+                                st.rerun()
+                            else:
+                                st.error(msg_db)
+                    else:
+                        st.warning("Por favor, preencha a descrição.")
+            
+            # --- TABELA DE ACOMPANHAMENTO ---
+            st.markdown("---")
+            st.markdown("#### 🗂️ Histórico de Registros")
+            
+            # Lê os dados filtrando pelo setor atual
+            df_diario = ler_diario_bordo(setor_atual)
+            
+            if not df_diario.empty:
+                # Ordena por data
+                try:
+                    df_diario['Data_Sort'] = pd.to_datetime(df_diario['Data'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+                    df_diario = df_diario.sort_values(by='Data_Sort', ascending=False).drop(columns=['Data_Sort'])
+                except:
+                    pass
+
+                # Função para adicionar emoji visual e cor no Pandas Styler
+                def highlight_status(val):
+                    status_str = str(val).strip().lower()
+                    if "pendente" in status_str:
+                        return 'color: #ef4444; font-weight: bold;' # Vermelho
+                    elif "validado" in status_str or "visto" in status_str or "ok" in status_str:
+                        return 'color: #10b981; font-weight: bold;' # Verde
+                    return ''
+
+                # Adiciona coluna visual de emoji para ficar mais bonito ainda
+                def add_icon(val):
+                    status_str = str(val).strip().lower()
+                    if "pendente" in status_str:
+                        return f"🔴 {val}"
+                    elif "validado" in status_str or "visto" in status_str or "ok" in status_str:
+                        return f"🟢 {val}"
+                    return val
+
+                # Aplica o ícone apenas para visualização
+                df_view = df_diario.copy()
+                if "Validação Gestão" in df_view.columns:
+                    df_view["Validação Gestão"] = df_view["Validação Gestão"].apply(add_icon)
+
+                # Renderiza com estilo
+                st.dataframe(
+                    df_view.style.applymap(highlight_status, subset=["Validação Gestão"]),
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Validação Gestão": st.column_config.TextColumn(
+                            "Status Gestão",
+                            help="Validação feita pela gestão geral na planilha (🔴 Pendente / 🟢 Validado)",
+                            width="medium"
+                        ),
+                        "Descrição": st.column_config.TextColumn(
+                            "Descrição",
+                            width="large"
+                        )
+                    }
+                )
+            else:
+                st.warning("Nenhum registro encontrado para este setor.")
+
+        # ABA 7 (PLANTÃO) e 8 (CLIENTE INTERNO) - SE FOREM DO SETOR SUPORTE
+        # Nota: Os índices das abas mudaram porque inserimos o Diário antes
         if setor_atual == "SUPORTE":
-            with abas_sup[5]:
+            with abas_sup[6]: # Era 5
                 if token:
                     with st.spinner("Carregando dados do Plantão..."):
                         df_plantao, stats_servico_plantao, _ = buscar_dados_plantao(token, d_inicial, d_final)
@@ -1856,9 +2012,7 @@ else:
                         else:
                             st.warning("Sem dados para a equipe de plantão neste período.")
 
-        # ABA 7: CLIENTE INTERNO (ESPECÍFICO SUPORTE - CONTA 5)
-        if setor_atual == "SUPORTE":
-            with abas_sup[6]:
+            with abas_sup[7]: # Era 6
                 if token:
                     # Passa a lista de nomes do SUPORTE para filtrar
                     nomes_suporte = SETORES_AGENTES["SUPORTE"]
