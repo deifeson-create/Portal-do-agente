@@ -7,6 +7,7 @@ import time
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 # ==============================================================================
 # 1. CONFIGURAÇÃO VISUAL E VARIÁVEIS GLOBAIS
@@ -122,6 +123,13 @@ try:
     
     SUPERVISOR_SUPORTE_LOGIN = st.secrets["auth"].get("SUPERVISOR_SUPORTE_LOGIN", "admin_sup")
     SUPERVISOR_SUPORTE_PASS = st.secrets["auth"].get("SUPERVISOR_SUPORTE_PASS", "senha_sup")
+
+    SUPERVISOR_NEGOCIACAO_LOGIN = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_LOGIN", "admin_neg")
+    SUPERVISOR_NEGOCIACAO_PASS = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_PASS", "senha_neg")
+
+    # Credencial MASTER (Gestão Geral)
+    MASTER_LOGIN = st.secrets["auth"].get("MASTER_LOGIN", "master_admin")
+    MASTER_PASS = st.secrets["auth"].get("MASTER_PASS", "master_senha")
     
     PESQUISAS_IDS = st.secrets["ids"]["PESQUISAS_IDS"]
     IDS_PERGUNTAS_VALIDAS = st.secrets["ids"]["IDS_PERGUNTAS_VALIDAS"]
@@ -252,7 +260,7 @@ def ler_diario_bordo(setor_filtro=None):
         try:
             data = sheet.get_all_records()
             df = pd.DataFrame(data)
-            if not df.empty and setor_filtro:
+            if not df.empty and setor_filtro and setor_filtro != "MASTER":
                 # Filtra apenas os registros do setor do supervisor logado
                 # Assume que a coluna se chama 'Setor' no Google Sheets
                 if 'Setor' in df.columns:
@@ -729,6 +737,46 @@ def _processar_agente_pausas(token, cod_agente, nome_agente, data_ini, data_fim)
                 "Hora Entrada": dt.strftime("%H:%M:%S"),
                 "Atraso": f"{mins}m"
             })
+    
+    # 3. GAPS DE DESLOGUE (ALMOÇO SEM PAUSA SISTÊMICA)
+    # Ordena todos os logins capturados por data
+    logins_ordenados = []
+    for l in logins_raw:
+        if l.get("data_login") and l.get("data_logout"):
+             try:
+                 d_in = datetime.strptime(l.get("data_login"), "%Y-%m-%d %H:%M:%S")
+                 d_out = datetime.strptime(l.get("data_logout"), "%Y-%m-%d %H:%M:%S")
+                 logins_ordenados.append((d_in, d_out))
+             except: pass
+    
+    logins_ordenados.sort(key=lambda x: x[0])
+    
+    # Agrupa por dia para não comparar logout de ontem com login de hoje
+    mapa_dias = defaultdict(list)
+    for i, o in logins_ordenados:
+        mapa_dias[i.date()].append((i, o))
+        
+    for dia, periodos in mapa_dias.items():
+        # periodos está ordenado por entrada
+        for i in range(len(periodos) - 1):
+            logout_atual = periodos[i][1]
+            login_proximo = periodos[i+1][0]
+            
+            # Gap em minutos
+            delta_min = (login_proximo - logout_atual).total_seconds() / 60.0
+            
+            # Se o buraco for compatível com intervalo de almoço (ex: > 30 min)
+            if delta_min > 30:
+                 # Verifica se estourou o limite definido para PAUSA LONGA
+                 limite_longa = LIMITES_PAUSA["LONGA"]
+                 if delta_min > (limite_longa + TOLERANCIA_VISUAL_ALMOCO):
+                     excesso = delta_min - limite_longa
+                     local_almoco.append({
+                        "Agente": nome_agente,
+                        "Data": dia.strftime("%d/%m/%Y"),
+                        "Duração": formatar_tempo_humano(delta_min),
+                        "Status": f"Gap Deslogue: Estourou {formatar_tempo_humano(excesso)}"
+                    })
             
     return local_curtas, local_almoco, local_logins, local_ranking
 
@@ -739,7 +787,8 @@ def processar_dados_pausas_supervisor(token, data_ini, data_fim, mapa_agentes):
     barra_progresso = st.progress(0, text="Auditando pausas e horários...")
     total = len(mapa_agentes)
     concluidos = 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    # REDUZIDO MAX_WORKERS PARA 3 (SEGURANÇA DA API)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(_processar_agente_pausas, token, cod, nome, data_ini, data_fim): nome for cod, nome in mapa_agentes.items()}
         for f in concurrent.futures.as_completed(futures):
             concluidos += 1
@@ -818,7 +867,8 @@ def processar_ranking_geral(token, data_ini, data_fim, mapa_agentes):
         return pos, tot
 
     dados_csat = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    # REDUZIDO MAX_WORKERS PARA 3 (SEGURANÇA DA API)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futs = {executor.submit(_fetch_csat_agente, cod): cod for cod in ids_validos}
         for f in concurrent.futures.as_completed(futs):
             cod = futs[f]
@@ -1113,7 +1163,8 @@ def processar_dados_pre_pausas_geral(token, data_ini, data_fim, mapa_agentes):
         return lista_retorno
 
     # Execução Paralela
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    # REDUZIDO MAX_WORKERS PARA 3 (SEGURANÇA DA API)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(_fetch_pre_pausa, cod, nome): nome for cod, nome in mapa_agentes.items()}
         for f in concurrent.futures.as_completed(futures):
             try:
@@ -1483,8 +1534,24 @@ if not st.session_state.auth_status:
                     st.session_state.user_setor = "SUPORTE"
                     st.session_state.user_data = {"nome": "Supervisor Suporte", "id": "SUPERVISOR_SUP"}
                     st.rerun()
+
+                # 4. Login Supervisor NEGOCIAÇÃO (Adicionado)
+                elif usuario == SUPERVISOR_NEGOCIACAO_LOGIN and senha == SUPERVISOR_NEGOCIACAO_PASS:
+                    st.session_state.auth_status = True
+                    st.session_state.user_role = "supervisor"
+                    st.session_state.user_setor = "NEGOCIACAO"
+                    st.session_state.user_data = {"nome": "Supervisor Negociação", "id": "SUPERVISOR_NEG"}
+                    st.rerun()
+
+                # 5. Login MASTER (Gestão Geral)
+                elif usuario == MASTER_LOGIN and senha == MASTER_PASS:
+                    st.session_state.auth_status = True
+                    st.session_state.user_role = "master"
+                    st.session_state.user_setor = "NRC" # Default inicial
+                    st.session_state.user_data = {"nome": "Gestão Geral", "id": "MASTER"}
+                    st.rerun()
                     
-                # 4. Login Agente (Genérico)
+                # 6. Login Agente (Genérico)
                 else:
                     with st.spinner("Autenticando..."):
                         token = get_admin_token()
@@ -1499,17 +1566,24 @@ else:
     render_top_bar(st.session_state.user_data['nome'], st.session_state.user_data['id'])
     token = get_admin_token()
     
-    # Define o setor atual com base no login
+    # Lógica de seleção de setor
     setor_atual = st.session_state.get("user_setor", "NRC")
+
+    # SE FOR MASTER, EXIBE O SELETOR DE SETOR NA SIDEBAR
+    if st.session_state.user_role == "master":
+        st.sidebar.markdown("---")
+        st.sidebar.header("👑 Painel Master")
+        setor_selecionado = st.sidebar.selectbox("Visualizar Setor:", list(SETORES_AGENTES.keys()), index=0)
+        setor_atual = setor_selecionado # Sobrescreve o setor atual com a escolha do Master
+
     
     # LOGICA DE VISÃO SUPERVISOR (GERAL OU INDIVIDUAL)
     modo_visao_supervisor = "Geral"
     id_alvo = None
     nome_alvo = None
 
-    if st.session_state.user_role == "supervisor":
+    if st.session_state.user_role == "supervisor" or st.session_state.user_role == "master":
         # Carrega lista apenas para o selectbox
-        # SE FOR NRC, USA LOGICA ANTIGA. SE FOR OUTRO, USA NOVA.
         with st.spinner("Carregando equipe..."):
             if setor_atual == "NRC":
                 _, _, _, mapa_agentes_sidebar, _ = buscar_dados_completos_supervisor(token, d_inicial, d_final)
@@ -1530,7 +1604,7 @@ else:
     # --------------------------------------------------------------------------
     # PAINEL AGENTE / VISÃO INDIVIDUAL
     # --------------------------------------------------------------------------
-    if st.session_state.user_role == "agente" or (st.session_state.user_role == "supervisor" and modo_visao_supervisor == "Individual"):
+    if st.session_state.user_role == "agente" or ((st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Individual"):
         
         if st.session_state.user_role == "agente":
             target_id = st.session_state.user_data['id']
@@ -1653,7 +1727,7 @@ else:
     # --------------------------------------------------------------------------
     # PAINEL SUPERVISOR GERAL (ADAPTADO PARA MULTISETOR)
     # --------------------------------------------------------------------------
-    elif st.session_state.user_role == "supervisor" and modo_visao_supervisor == "Geral":
+    elif (st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Geral":
         st.markdown(f"## 🏢 Painel de Gestão - Setor {setor_atual}")
         
         # Definição das abas (Condicional para SUPORTE)
@@ -1768,7 +1842,9 @@ else:
 
         # ABA 3: PAUSAS
         with abas_sup[2]:
-            if token and 'mapa_agentes' in locals():
+            # Utiliza SEMPRE o mapa_agentes filtrado pelo setor
+            # Isso garante que tanto o supervisor quanto o Master vejam apenas o setor selecionado
+            if token and mapa_agentes:
                 lista_curtas, lista_almoco, lista_logins, lista_ranking = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes)
                 c_p1, c_p2 = st.columns(2)
                 with c_p1:
@@ -1925,8 +2001,9 @@ else:
             st.markdown("---")
             st.markdown("#### 🗂️ Histórico de Registros")
             
-            # Lê os dados filtrando pelo setor atual
-            df_diario = ler_diario_bordo(setor_atual)
+            # Lê os dados filtrando pelo setor atual (Master vê tudo)
+            filtro_leitura = setor_atual if st.session_state.user_role != "master" else None
+            df_diario = ler_diario_bordo(filtro_leitura)
             
             if not df_diario.empty:
                 # Ordena por data
