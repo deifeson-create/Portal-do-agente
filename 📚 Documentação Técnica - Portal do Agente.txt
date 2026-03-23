@@ -1,0 +1,66 @@
+﻿📚 Documentação Técnica - Portal do Agente (Visão TI)
+Versão: 16.2 (Platinum)
+Framework: Python + Streamlit
+Integrações: REST API (Matrix do Brasil), Google Sheets API (gspread)
+1. Arquitetura Geral e Gerenciamento de Estado
+O sistema é uma aplicação Single-Page Application (SPA) reativa baseada no Streamlit. Toda a persistência de dados de navegação e credenciais é gerenciada pelo st.session_state.
+* st.session_state.app_unlocked: Controla o Gatekeeper inicial (Senha Mestra).
+* st.session_state.auth_status: Booleano de controle da sessão logada.
+* st.session_state.user_role: Define a árvore de permissões (agente, supervisor, master).
+* st.session_state.user_setor: Controla o contexto dos dados requisitados na API.
+2. Segurança e Controle de Acesso (RBAC)
+A aplicação opera com três camadas de segurança:
+1. Gatekeeper Hardcoded: A função check_master_password() bloqueia o parseamento do DOM via st.stop() caso o input do usuário não bata com o secret [security]["MASTER_PASSWORD"].
+2. Autenticação Local (Mockada): Contas de supervisores e do "Master" são validadas através de credenciais armazenadas de forma segura no st.secrets.
+3. Autenticação Dinâmica via API: Se as credenciais não pertencerem à gestão, o sistema requisita um Token JWT genérico (Admin) via endpoint /authuser e valida a existência do login do agente chamando o endpoint /agentes.
+3. Estratégias de Otimização e Performance
+Devido ao alto volume de chamadas HTTP, o sistema implementa duas técnicas cruciais para não derrubar a API terceira e não congelar a UI:
+* Caching (@st.cache_data): Decorators aplicados nas funções de fetch. O TTL (Time to Live) varia conforme o peso:
+   * Tokens e IDs Estáticos: ttl=3600 (1 hora).
+   * Dados Estatísticos e Logins: ttl=300 (5 minutos).
+   * Pausas e Tempo Real: ttl=60 (1 minuto).
+* Multithreading (concurrent.futures): A função processar_dados_pausas_supervisor utiliza um ThreadPoolExecutor(max_workers=2) para auditar as pausas e pré-pausas da equipe simultaneamente, reduzindo o tempo de carregamento de $O(N)$ para um processamento paralelo restrito, evitando estourar o Rate Limit da API (por isso apenas 2 workers).
+* Sleep Delays: Proteções de .sleep(0.3) a .sleep(0.5) inseridas iterativamente após cada requests.get/post para evitar bloqueios de IP (Throttling) do servidor Matrix.
+4. Integração de Dados (Endpoints Matrix API)
+O core de BI do sistema consome os seguintes endpoints REST via requisições autenticadas por Bearer Token:
+* /relAtEstatistico: Retorna dados agrupados de TMA, TME, TMIA, TMIC e Volumes (Qtd Bruta e Qtd Abandonada).
+* /RelPesqAnalitico: Extração de microdados das avaliações CSAT.
+* /relAgentePausa e /relAgenteLogin: Mapeamento de jornada e ociosidade sistêmica.
+* /relPausasAgendadas: Endpoint específico para "Pré-Pausas".
+* /agentesOnline e /deslogarAgente: Monitoramento síncrono e POST para Kill Switch de sessão do agente.
+5. Lógicas de Negócio e Algoritmos Core
+5.1. Normalização e Filtro Inteligente de Serviços
+Para resolver inconsistências no banco de dados da API (ex: NEGOCIAÇÃO PASSIVA com duplo espaço invisível), a arquitetura deixou de fazer requisições por nome exato e passou a baixar todos os serviços em lote.
+* Método Aplicado: Iteração cruzada removendo arrays vazios de string. if " ".join(s_alvo.upper().split()) == " ".join(nome_servico.split()):. Isso garante precisão absoluta na aglutinação dos dados de volumetria.
+5.2. Cálculo de Volume e Tempos (Weighted Average)
+O cálculo do sistema é Net Volume (Volume Líquido).
+* A regra matemática é: Volume = num_qtd_bruta - num_qtd_abandonado.
+* O sistema utiliza a função calcular_media_tempos() que converte strings HH:MM:SS para segundos, aplica uma Média Ponderada com base no volume de cada serviço e reconverte para string.
+5.3. CSAT e Detratores
+A API retorna os dados brutos de pesquisa de satisfação em blocos de paginação.
+* A função buscar_csat_nrc isola apenas os id_pergunta válidos, extrai o valor numérico (nom_valor) e aplica a regra de negócio da empresa: Nota >= 8 = Positiva (Promotor/Neutro); Nota < 8 = Negativa (Detrator).
+5.4. Algoritmo Analítico de Pausas e "Gaps de Deslogue"
+A função de auditoria classifica as pausas baseadas em strings literais:
+* Pausa Curta ("Manhã/Tarde/Noite"): Limite 15.0 min. Excedentes são acumulados e, se passarem de 20 min no mês, geram status de ADVERTÊNCIA.
+* Pausa Longa ("Almoço/Plantão"): Limite 120.0 min + Tolerância visual.
+* Gap Finder (Almoço sem Pausa Sistêmica): O algoritmo cruza as arrays de data de Entrada e Saída (data_login e data_logout). Ele compara o fim da sessão X com o início da sessão Y no mesmo dia. Se o intervalo for $> 30$ minutos, ele presume intervalo de refeição e aplica o limite de 120 minutos para apontar possíveis estouramentos não declarados na API de pausas.
+5.5. Algoritmo do MVP do Mês (Eleição Automática)
+A função eleger_melhor_do_mes(df_rank) aplica um método de Ranqueamento Combinado (Rank Sum):
+1. Filtra agentes com Volume $> 0$ e Avaliações $> 0$.
+2. Ordena e atribui pontuação (Rank) ao TMA (Menor = Melhor), TMIA (Menor = Melhor) e CSAT (Maior = Melhor).
+3. Soma as três posições criando um Score_Final.
+4. O Agente com o menor valor agregado (que ficou nos topos das três tabelas simultaneamente) é eleito o MVP.
+6. Módulos Específicos
+6.1. Gestão de Jovens Aprendizes
+Módulo injetado nos setores NRC e SUPORTE. Possui uma matriz de validação estrita (Alerta Vermelho):
+* Itera sobre o DataFrame gerado por buscar_dados_jovem_aprendiz.
+* Se TMIA > 00:01:00 (Convertido para > 60 segundos), dispara a string de motivo "TMIA Alto".
+* Se CSAT < 90.0%, dispara "CSAT Baixo".
+* Muda visualmente o Status do DataFrame para 🔴.
+6.2. Plantão (Madrugada) e Cliente Interno
+* Plantão: Como agentes de plantão (Tarcisio, Geibson, etc.) tocam múltiplos serviços (Comercial, Financeiro) fora do escopo padrão do "Suporte", a função buscar_dados_plantao isola os dados atrelando as requisições puramente às IDs destes agentes em específico, ignorando a trava global de serviços. O filtro diurno também foi atualizado para retirar esses IDs, a fim de não poluir o TMA diurno.
+* Cliente Interno: Filtro direcionado ao parâmetro hardcoded id_conta: "5".
+6.3. Bancos de Dados Auxiliares (Google Sheets)
+Utiliza a biblioteca gspread juntamente com oauth2client conectada a uma API de Conta de Serviço (GCP).
+* Solicitações: Grava dados de contestações dos agentes.
+* Diário de Bordo: Ferramenta de Gestão da Supervisão. A leitura ler_diario_bordo() filtra dinamicamente no DataFrame Pandas o que é exibido, mostrando apenas a coluna Setor atrelada à session_state do supervisor logado (isolando dados de diferentes coordenações), enquanto o perfil Master recebe o DataFrame integral (sem filtro setor_filtro). As validações aplicam uso do módulo interno .style.applymap nativo do Pandas para colorização HTML no Streamlit (🟢/🔴).
