@@ -166,7 +166,7 @@ SETORES_AGENTES = {
 SETORES_SERVICOS = {
     "NRC": SERVICOS_ALVO,
     "CANCELAMENTO": ['CANCELAMENTO'], 
-    "NEGOCIACAO": ['NEGOCIAÇÃO ATIVA', 'NEGOCIAÇÃO PASSIVA'], 
+    "NEGOCIACAO": ['NEGOCIAÇÃO ATIVA', 'NEGOCIAÇÃO  PASSIVA'], 
     "SUPORTE": ['SUPORTE', 'LIBERAÇÃO'] 
 }
 
@@ -517,7 +517,6 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
     mapa_agentes = {}
     nrc_upper = [x.strip().upper() for x in LISTA_NRC + JOVENS_APRENDIZES_NRC]
     
-    # 1. Mapeamento de Agentes
     pagina = 1
     while True:
         try:
@@ -556,9 +555,20 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
         for s in SERVICOS_ALVO
     }
 
-    if not ids_agentes: return resultados, 0.0, 0, mapa_agentes, {"tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--"}, 0
+    # EXCLUSÃO ISOLADA DE JOVEM APRENDIZ DOS DADOS GERAIS
+    ids_agentes_stats = []
+    nomes_aprendizes = [x.strip().upper() for x in JOVENS_APRENDIZES_NRC]
+    for cod, nome in mapa_agentes.items():
+        is_aprendiz = False
+        for alvo in nomes_aprendizes:
+            if alvo in nome.split() or (" " in alvo and alvo in nome): 
+                is_aprendiz = True
+                break
+        if not is_aprendiz:
+            ids_agentes_stats.append(cod)
+
+    if not ids_agentes_stats: return resultados, 0.0, 0, mapa_agentes, {"tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--"}, 0
     
-    # 2. Dados Globais NRC
     dados_globais = {"tma": "--:--", "tme": "--:--", "tmia": "--:--", "tmic": "--:--"}
     tempos_globais_agregados = {"tma": [], "tme": [], "tmia": [], "tmic": []}
     pesos_globais = []
@@ -569,8 +579,8 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
             params_globais = {
                 "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
                 "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
-                "agrupador": "conta", 
-                "agente[]": ids_agentes,
+                "agrupador": "agente", 
+                "agente[]": ids_agentes_stats, # Apenas Agentes Regulares
                 "canal[]": ids_canais,
                 "id_conta": conta
             }
@@ -579,15 +589,24 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
             if r_global.status_code == 200:
                 lista_global = r_global.json()
                 if lista_global and isinstance(lista_global, list):
-                    item_global = lista_global[0]
-                    vol = int(item_global.get("num_qtd", 0)) - int(item_global.get("num_qtd_abandonado", 0))
-                    if vol > 0:
-                        volume_total_setor += vol
-                        pesos_globais.append(vol)
-                        tempos_globais_agregados["tma"].append(item_global.get("tma", "00:00:00"))
-                        tempos_globais_agregados["tme"].append(item_global.get("tme", "00:00:00"))
-                        tempos_globais_agregados["tmia"].append(item_global.get("tmia", "00:00:00"))
-                        tempos_globais_agregados["tmic"].append(item_global.get("tmic", "00:00:00"))
+                    for item in lista_global:
+                        nome_api = str(item.get("agrupador", "")).upper()
+                        cod_match = None
+                        for cod in ids_agentes_stats:
+                            nome_ag = mapa_agentes[cod]
+                            if nome_ag == nome_api or nome_ag in nome_api:
+                                cod_match = cod
+                                break
+                                
+                        if cod_match:
+                            vol = int(item.get("num_qtd", 0)) - int(item.get("num_qtd_abandonado", 0))
+                            if vol > 0:
+                                volume_total_setor += vol
+                                pesos_globais.append(vol)
+                                tempos_globais_agregados["tma"].append(item.get("tma", "00:00:00"))
+                                tempos_globais_agregados["tme"].append(item.get("tme", "00:00:00"))
+                                tempos_globais_agregados["tmia"].append(item.get("tmia", "00:00:00"))
+                                tempos_globais_agregados["tmic"].append(item.get("tmic", "00:00:00"))
         except: pass
 
     if pesos_globais:
@@ -596,7 +615,6 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
         dados_globais["tmia"] = calcular_media_tempos(tempos_globais_agregados["tmia"], pesos_globais)
         dados_globais["tmic"] = calcular_media_tempos(tempos_globais_agregados["tmic"], pesos_globais)
 
-    # 3. Estatísticas por Serviço Inteligente (Sem falha de espaço)
     tempos_srv_agregados = {s: {"vols": [], "tma": [], "tme": [], "tmia": [], "tmic": []} for s in SERVICOS_ALVO}
     
     for conta in contas_selecionadas:
@@ -604,7 +622,7 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
             "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
             "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
             "agrupador": "servico",
-            "agente[]": ids_agentes,
+            "agente[]": ids_agentes_stats, # Apenas Agentes Regulares
             "canal[]": ids_canais,
             "id_conta": conta
         }
@@ -618,7 +636,6 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
                         nome_servico = str(item.get("agrupador", "")).upper()
                         match_srv = None
                         
-                        # Filtro inteligente de espaço
                         for s_alvo in SERVICOS_ALVO:
                             if " ".join(s_alvo.upper().split()) == " ".join(nome_servico.split()):
                                 match_srv = s_alvo
@@ -645,7 +662,6 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
             resultados[s_alvo]["tmia"] = calcular_media_tempos(tempos_srv_agregados[s_alvo]["tmia"], vols)
             resultados[s_alvo]["tmic"] = calcular_media_tempos(tempos_srv_agregados[s_alvo]["tmic"], vols)
 
-    # 4. Satisfação (CSAT)
     csat_geral_pos = 0; csat_geral_total = 0
     for p_id in PESQUISAS_IDS:
         for conta in contas_selecionadas:
@@ -655,7 +671,7 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
                     "data_inicial": data_ini.strftime("%Y-%m-%d"), 
                     "data_final": data_fim.strftime("%Y-%m-%d"), 
                     "pesquisa": p_id, "id_conta": conta, "limit": 1000, 
-                    "page": p_page, "agente[]": ids_agentes
+                    "page": p_page, "agente[]": ids_agentes_stats # Apenas Agentes Regulares
                 }
                 try:
                     r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=p_params)
@@ -669,21 +685,29 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
                             if bloco.get("sintetico"): total_api += sum(int(x.get("num_quantidade", 0)) for x in bloco["sintetico"])
                             for resp in bloco.get("respostas", []):
                                 try:
-                                    servico_resp = str(resp.get("nom_servico", "")).upper()
-                                    val_raw = resp.get("nom_valor")
-                                    if val_raw and val_raw != "": nota = int(float(val_raw))
-                                    else: nota = -1
+                                    nom_ag = str(resp.get("nom_agente", "")).upper()
+                                    cod_match = None
+                                    for cod in ids_agentes_stats:
+                                        nome_ag = mapa_agentes[cod]
+                                        if nome_ag == nom_ag or nome_ag in nom_ag:
+                                            cod_match = cod
+                                            break
                                     
-                                    if nota >= 0: 
-                                        csat_geral_total += 1
-                                        if nota >= 8: csat_geral_pos += 1
+                                    if cod_match:
+                                        servico_resp = str(resp.get("nom_servico", "")).upper().strip()
+                                        val_raw = resp.get("nom_valor")
+                                        if val_raw and val_raw != "": nota = int(float(val_raw))
+                                        else: nota = -1
                                         
-                                        # Filtro Inteligente de espaço no CSAT
-                                        for s_alvo in SERVICOS_ALVO:
-                                            if " ".join(s_alvo.upper().split()) == " ".join(servico_resp.split()):
-                                                resultados[s_alvo]["csat_total"] += 1
-                                                if nota >= 8: resultados[s_alvo]["csat_pos"] += 1
-                                                break
+                                        if nota >= 0: 
+                                            csat_geral_total += 1
+                                            if nota >= 8: csat_geral_pos += 1
+                                            
+                                            for s_alvo in SERVICOS_ALVO:
+                                                if " ".join(s_alvo.upper().split()) == " ".join(servico_resp.split()):
+                                                    resultados[s_alvo]["csat_total"] += 1
+                                                    if nota >= 8: resultados[s_alvo]["csat_pos"] += 1
+                                                    break
                                 except: pass
                     if (p_page * 1000) >= total_api: break
                     if len(data) < 2: break
@@ -946,9 +970,10 @@ def eleger_melhor_do_mes(df_rank):
     df_calc = df_calc[(df_calc['Volume'] > 0) & (df_calc['CSAT Qtd'] > 0)].copy()
     if df_calc.empty: return None
     
-    df_calc['Rank_TMA'] = df_calc['TMA_Seg'].rank(ascending=True)
-    df_calc['Rank_TMIA'] = df_calc['TMIA_Seg'].rank(ascending=True)
-    df_calc['Rank_CSAT'] = df_calc['CSAT Score'].rank(ascending=False)
+    # Adicionado method='min' para não penalizar empates puros.
+    df_calc['Rank_TMA'] = df_calc['TMA_Seg'].rank(ascending=True, method='min')
+    df_calc['Rank_TMIA'] = df_calc['TMIA_Seg'].rank(ascending=True, method='min')
+    df_calc['Rank_CSAT'] = df_calc['CSAT Score'].rank(ascending=False, method='min')
     
     df_calc['Score_Final'] = df_calc['Rank_TMA'] + df_calc['Rank_TMIA'] + df_calc['Rank_CSAT']
     
@@ -956,7 +981,9 @@ def eleger_melhor_do_mes(df_rank):
     mvps = df_calc[df_calc['Score_Final'] == min_score]
     
     nomes = mvps['Agente'].tolist()
-    return ", ".join(nomes)
+    if len(nomes) > 1:
+        return "Empate: " + " | ".join(nomes)
+    return nomes[0]
 
 # ==============================================================================
 # 5.1 FUNÇÕES MULTISETOR (ADICIONADAS PARA NÃO ALTERAR AS ANTIGAS)
@@ -1033,14 +1060,26 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
     
     ids_agentes_stats = []
     nomes_plantao_upper = [x.strip().upper() for x in LISTA_PLANTAO]
+    nomes_aprendizes = [x.strip().upper() for x in (JOVENS_APRENDIZES_NRC if setor_nome == "NRC" else JOVENS_APRENDIZES_SUPORTE)]
     
+    # EXCLUSÃO ISOLADA DE JOVEM APRENDIZ E PLANTÃO DOS DADOS GERAIS
     for cod, nome_upper in mapa_agentes.items():
-        is_plantao = False
+        is_excluido = False
+        
         if excluir_plantao and setor_nome == "SUPORTE":
             partes_nome = nome_upper.split()
             for p_alvo in nomes_plantao_upper:
-                if p_alvo in partes_nome: is_plantao = True; break
-        if not is_plantao:
+                if p_alvo in partes_nome or (" " in p_alvo and p_alvo in nome_upper): 
+                    is_excluido = True
+                    break
+                    
+        partes_nome_ap = nome_upper.split()
+        for p_alvo in nomes_aprendizes:
+            if p_alvo in partes_nome_ap or (" " in p_alvo and p_alvo in nome_upper): 
+                is_excluido = True
+                break
+
+        if not is_excluido:
             ids_agentes_stats.append(cod)
     
     resultados = {
@@ -1063,8 +1102,8 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
             params_globais = {
                 "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
                 "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
-                "agrupador": "conta", 
-                "agente[]": ids_agentes_stats,
+                "agrupador": "agente", 
+                "agente[]": ids_agentes_stats, # Apenas Agentes Regulares
                 "canal[]": ids_canais,
                 "id_conta": conta
             }
@@ -1073,15 +1112,24 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
             if r_global.status_code == 200:
                 lista_global = r_global.json()
                 if lista_global and isinstance(lista_global, list):
-                    item_global = lista_global[0]
-                    vol = int(item_global.get("num_qtd", 0)) - int(item_global.get("num_qtd_abandonado", 0))
-                    if vol > 0:
-                        volume_total_setor += vol
-                        pesos_globais.append(vol)
-                        tempos_globais_agregados["tma"].append(item_global.get("tma", "00:00:00"))
-                        tempos_globais_agregados["tme"].append(item_global.get("tme", "00:00:00"))
-                        tempos_globais_agregados["tmia"].append(item_global.get("tmia", "00:00:00"))
-                        tempos_globais_agregados["tmic"].append(item_global.get("tmic", "00:00:00"))
+                    for item in lista_global:
+                        nome_api = str(item.get("agrupador", "")).upper()
+                        cod_match = None
+                        for cod in ids_agentes_stats:
+                            nome_ag = mapa_agentes[cod]
+                            if nome_ag == nome_api or nome_ag in nome_api:
+                                cod_match = cod
+                                break
+                                
+                        if cod_match:
+                            vol = int(item.get("num_qtd", 0)) - int(item.get("num_qtd_abandonado", 0))
+                            if vol > 0:
+                                volume_total_setor += vol
+                                pesos_globais.append(vol)
+                                tempos_globais_agregados["tma"].append(item.get("tma", "00:00:00"))
+                                tempos_globais_agregados["tme"].append(item.get("tme", "00:00:00"))
+                                tempos_globais_agregados["tmia"].append(item.get("tmia", "00:00:00"))
+                                tempos_globais_agregados["tmic"].append(item.get("tmic", "00:00:00"))
         except: pass
 
     if pesos_globais:
@@ -1090,7 +1138,6 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
         dados_globais["tmia"] = calcular_media_tempos(tempos_globais_agregados["tmia"], pesos_globais)
         dados_globais["tmic"] = calcular_media_tempos(tempos_globais_agregados["tmic"], pesos_globais)
 
-    # 3. Estatísticas por Serviço Inteligente (Sem falha de espaço)
     tempos_srv_agregados = {s: {"vols": [], "tma": [], "tme": [], "tmia": [], "tmic": []} for s in lista_servicos_alvo}
     
     for conta in contas_selecionadas:
@@ -1098,7 +1145,7 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
             "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
             "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
             "agrupador": "servico",
-            "agente[]": ids_agentes_stats,
+            "agente[]": ids_agentes_stats, # Apenas Agentes Regulares
             "canal[]": ids_canais,
             "id_conta": conta
         }
@@ -1112,7 +1159,6 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
                         nome_servico = str(item.get("agrupador", "")).upper()
                         match_srv = None
                         
-                        # Filtro inteligente que equaliza espaços duplos/simples
                         for s_alvo in lista_servicos_alvo:
                             if " ".join(s_alvo.upper().split()) == " ".join(nome_servico.split()):
                                 match_srv = s_alvo
@@ -1139,7 +1185,6 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
             resultados[s_alvo]["tmia"] = calcular_media_tempos(tempos_srv_agregados[s_alvo]["tmia"], vols)
             resultados[s_alvo]["tmic"] = calcular_media_tempos(tempos_srv_agregados[s_alvo]["tmic"], vols)
 
-    # 4. Satisfação (CSAT)
     csat_geral_pos = 0; csat_geral_total = 0
     for p_id in PESQUISAS_IDS:
         for conta in contas_selecionadas:
@@ -1149,7 +1194,7 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
                     "data_inicial": data_ini.strftime("%Y-%m-%d"), 
                     "data_final": data_fim.strftime("%Y-%m-%d"), 
                     "pesquisa": p_id, "id_conta": conta, "limit": 1000, 
-                    "page": p_page, "agente[]": ids_agentes_stats
+                    "page": p_page, "agente[]": ids_agentes_stats # Apenas Agentes Regulares
                 }
                 try:
                     r = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=p_params)
@@ -1163,20 +1208,29 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
                             if bloco.get("sintetico"): total_api += sum(int(x.get("num_quantidade", 0)) for x in bloco["sintetico"])
                             for resp in bloco.get("respostas", []):
                                 try:
-                                    servico_resp = str(resp.get("nom_servico", "")).upper()
-                                    val_raw = resp.get("nom_valor")
-                                    if val_raw and val_raw != "": nota = int(float(val_raw))
-                                    else: nota = -1
+                                    nom_ag = str(resp.get("nom_agente", "")).upper()
+                                    cod_match = None
+                                    for cod in ids_agentes_stats:
+                                        nome_ag = mapa_agentes[cod]
+                                        if nome_ag == nom_ag or nome_ag in nom_ag:
+                                            cod_match = cod
+                                            break
                                     
-                                    if nota >= 0: 
-                                        csat_geral_total += 1
-                                        if nota >= 8: csat_geral_pos += 1
+                                    if cod_match:
+                                        servico_resp = str(resp.get("nom_servico", "")).upper().strip()
+                                        val_raw = resp.get("nom_valor")
+                                        if val_raw and val_raw != "": nota = int(float(val_raw))
+                                        else: nota = -1
                                         
-                                        for s_alvo in lista_servicos_alvo:
-                                            if " ".join(s_alvo.upper().split()) == " ".join(servico_resp.split()):
-                                                resultados[s_alvo]["csat_total"] += 1
-                                                if nota >= 8: resultados[s_alvo]["csat_pos"] += 1
-                                                break
+                                        if nota >= 0: 
+                                            csat_geral_total += 1
+                                            if nota >= 8: csat_geral_pos += 1
+                                            
+                                            for s_alvo in lista_servicos_alvo:
+                                                if " ".join(s_alvo.upper().split()) == " ".join(servico_resp.split()):
+                                                    resultados[s_alvo]["csat_total"] += 1
+                                                    if nota >= 8: resultados[s_alvo]["csat_pos"] += 1
+                                                    break
                                 except: pass
                     if (p_page * 1000) >= total_api: break
                     if len(data) < 2: break
@@ -1342,7 +1396,7 @@ def buscar_dados_plantao(token, data_ini, data_fim, contas_selecionadas):
             "data_inicial": f"{data_ini.strftime('%Y-%m-%d')} 00:00:00",
             "data_final": f"{data_fim.strftime('%Y-%m-%d')} 23:59:59",
             "agrupador": "servico", 
-            "agente[]": ids_plantao,
+            "agente[]": ids_plantao, 
             "canal[]": ids_canais,
             "id_conta": conta
         }
@@ -1364,19 +1418,9 @@ def buscar_dados_plantao(token, data_ini, data_fim, contas_selecionadas):
                         stats_por_servico[serv]["tmia"].append(item.get("tmia", "00:00:00"))
                         stats_por_servico[serv]["tmic"].append(item.get("tmic", "00:00:00"))
         except: pass
-        
-    stats_servico_finais = {}
-    for serv, st_data in stats_por_servico.items():
-        if st_data["num_qtd"] > 0:
-            stats_servico_finais[serv] = {
-                "num_qtd": st_data["num_qtd"],
-                "tma": calcular_media_tempos(st_data["tma"], st_data["pesos"]),
-                "tme": calcular_media_tempos(st_data["tme"], st_data["pesos"]),
-                "tmia": calcular_media_tempos(st_data["tmia"], st_data["pesos"]),
-                "tmic": calcular_media_tempos(st_data["tmic"], st_data["pesos"])
-            }
 
     csat_scores = {}
+    csat_servico = {}
     for pid in PESQUISAS_IDS:
         for conta in contas_selecionadas:
             pg = 1
@@ -1396,15 +1440,40 @@ def buscar_dados_plantao(token, data_ini, data_fim, contas_selecionadas):
                                 nom_ag = str(rsp.get("nom_agente","")).upper()
                                 nome_match = next((n for c, n in mapa_plantao.items() if n == nom_ag or n in nom_ag), nom_ag)
                                 
-                                val = float(rsp.get("nom_valor", -1))
-                                if val >= 0:
-                                    if nome_match not in csat_scores: csat_scores[nome_match] = {"pos": 0, "tot": 0}
-                                    csat_scores[nome_match]["tot"] += 1
-                                    if val >= 8: csat_scores[nome_match]["pos"] += 1
+                                if nome_match:
+                                    serv_resp = str(rsp.get("nom_servico", "")).upper().strip()
+                                    val = float(rsp.get("nom_valor", -1))
+                                    if val >= 0:
+                                        if nome_match not in csat_scores: csat_scores[nome_match] = {"pos": 0, "tot": 0}
+                                        csat_scores[nome_match]["tot"] += 1
+                                        if val >= 8: csat_scores[nome_match]["pos"] += 1
+                                        
+                                        if serv_resp not in csat_servico: csat_servico[serv_resp] = {"pos": 0, "tot": 0}
+                                        csat_servico[serv_resp]["tot"] += 1
+                                        if val >= 8: csat_servico[serv_resp]["pos"] += 1
                     if (pg * 1000) >= total_k: break
                     if len(dd) < 2: break
                     pg += 1
                 except: break
+                
+    stats_servico_finais = {}
+    for serv, st_data in stats_por_servico.items():
+        if st_data["num_qtd"] > 0:
+            c_pos = 0; c_tot = 0
+            for s_k, s_v in csat_servico.items():
+                if " ".join(s_k.split()) == " ".join(serv.upper().split()):
+                    c_pos += s_v["pos"]
+                    c_tot += s_v["tot"]
+            
+            stats_servico_finais[serv] = {
+                "num_qtd": st_data["num_qtd"],
+                "tma": calcular_media_tempos(st_data["tma"], st_data["pesos"]),
+                "tme": calcular_media_tempos(st_data["tme"], st_data["pesos"]),
+                "tmia": calcular_media_tempos(st_data["tmia"], st_data["pesos"]),
+                "tmic": calcular_media_tempos(st_data["tmic"], st_data["pesos"]),
+                "csat_pos": c_pos,
+                "csat_tot": c_tot
+            }
             
     for row in lista_stats_agente:
         ag = row["Agente"]
@@ -1503,7 +1572,6 @@ def buscar_dados_cliente_interno(token, data_ini, data_fim, nomes_suporte_valido
 
 @st.cache_data(ttl=300)
 def buscar_dados_jovem_aprendiz(token, data_ini, data_fim, setor_nome, contas_selecionadas):
-    """Busca, filtra e constrói o painel analítico para os Jovens Aprendizes"""
     headers = {"Authorization": f"Bearer {token}"}
     ids_ja = []
     mapa_ja = {}
@@ -1775,12 +1843,13 @@ def barra_lateral_com_changelog():
         else: d_ini = st.date_input("Início", hoje-timedelta(1)); d_fim = st.date_input("Fim", hoje)
         st.info(f"De: {d_ini.strftime('%d/%m')} até {d_fim.strftime('%d/%m')}")
         st.markdown("---")
-        with st.expander("📜 Versão Platinum 16.2"):
+        with st.expander("📜 Versão Platinum 16.4"):
             st.markdown("""
-            **v16.2 - Nova Engenharia de Busca & Jovens Aprendizes**
-            - **Filtro Inteligente:** O sistema agora equaliza serviços com duplo espaço e resolve bugs de parâmetros invisíveis, garantindo todos os dados da Negociação.
-            - **Nomes Compostos:** Perfeito reconhecimento de agentes como `ANA L.` e `RUAN JA`.
-            - **Jovem Aprendiz:** Aba completa com Ranking, Alerta Vermelho de Produtividade/Qualidade e Tabela de Feedbacks por protocolo.
+            **v16.4 - Ajustes de Bugs e Refinamento de Lógicas**
+            - **Global Inteligente:** A aba Geral não pede mais totais aglutinados, garantindo o descarte real dos Aprendizes.
+            - **MVP Empatado:** Novo cálculo do Melhor do Mês cruza somente TMA, TMIA e CSAT. Em caso de empate matemático, exibe todos os empatados.
+            - **Atrasos (Rankings):** Adicionada coluna visual (⚠️) apontando o volume de atrasos detectados no cruzamento de logs.
+            - **CSAT Plantão Geral:** Corrigido render para mostrar nota média no bloco de visualização geral de serviços.
             """)
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.auth_status = False; st.session_state.user_data = None; st.rerun()
@@ -2029,7 +2098,6 @@ else:
     elif (st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Geral":
         st.markdown(f"## 🏢 Painel de Gestão - Setor {setor_atual}")
         
-        # Definição das abas
         lista_abas = ["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações", "📝 Diário de Bordo"]
         if setor_atual in ["NRC", "SUPORTE"]:
             lista_abas.append("👶 Jovem Aprendiz")
@@ -2039,6 +2107,19 @@ else:
             
         abas_sup = st.tabs(lista_abas)
         
+        # Criação do mapa isolado (Sem Jovem Aprendiz) para ser passado para as próximas abas (Ranking, Pausas, Tempo Real)
+        mapa_agentes_filtrado = {}
+        if 'mapa_agentes_sidebar' in locals():
+            lista_exclusao = [x.strip().upper() for x in (JOVENS_APRENDIZES_NRC if setor_atual == "NRC" else JOVENS_APRENDIZES_SUPORTE)]
+            for cod, nome in mapa_agentes_sidebar.items():
+                is_excluido = False
+                for alvo in lista_exclusao:
+                    if alvo in nome.split() or (" " in alvo and alvo in nome): 
+                        is_excluido = True
+                        break
+                if not is_excluido:
+                    mapa_agentes_filtrado[cod] = nome
+
         # ABA 1: VISÃO GERAL
         with abas_sup[0]:
             if token:
@@ -2112,9 +2193,14 @@ else:
                         for servico, dado in stats_servico_plantao.items():
                             st.markdown(f"<div class='service-header'>{servico} (Plantão)</div>", unsafe_allow_html=True)
                             
+                            tot_p = dado.get("csat_tot", 0)
+                            pos_p = dado.get("csat_pos", 0)
+                            score_p = (pos_p / tot_p * 100) if tot_p > 0 else 0.0
+                            cor_p = "#10b981" if score_p >= 85 else ("#f59e0b" if score_p >= 75 else "#ef4444")
+                            
                             col1, col2, col3, col4, col5, col6 = st.columns(6)
                             with col1: render_kpi_card("Volume", str(dado.get("num_qtd", 0)), "Atendimentos", "#8b5cf6")
-                            with col2: render_kpi_card("Satisfação", "--%", "Verifique na aba específica", "#6b7280")
+                            with col2: render_kpi_card("Satisfação", f"{score_p:.2f}%", f"Base: {tot_p}", cor_p)
                             with col3: render_kpi_card("T.M.A", str(dado.get("tma", "--:--")), "Tempo Médio", "#3b82f6")
                             with col4: render_kpi_card("T.M.E", str(dado.get("tme", "--:--")), "Fila/Espera", "#ef4444")
                             with col5: render_kpi_card("T.M.I.A", str(dado.get("tmia", "--:--")), "Inatividade Agt", "#f59e0b")
@@ -2122,16 +2208,25 @@ else:
         
         # ABA 2: RANKINGS
         with abas_sup[1]:
-            if token and 'mapa_agentes' in locals():
+            if token and 'mapa_agentes_filtrado' in locals():
                 with st.spinner("Calculando o MVP do Mês..."):
-                    lista_rank = processar_ranking_geral(token, d_inicial, d_final, mapa_agentes, contas_tuple)
+                    lista_rank = processar_ranking_geral(token, d_inicial, d_final, mapa_agentes_filtrado, contas_tuple)
+                    _, _, lista_logins, _ = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes_filtrado)
                     
                     if lista_rank:
                         df_rank = pd.DataFrame(lista_rank)
                         mvp_nome = eleger_melhor_do_mes(df_rank)
                         
+                        atrasos_dict = defaultdict(int)
+                        if lista_logins:
+                            for l in lista_logins:
+                                atrasos_dict[l['Agente']] += 1
+                                
+                        df_rank['Atrasos (Informativo)'] = df_rank['Agente'].map(lambda x: atrasos_dict[x]).fillna(0).astype(int)
+                        df_rank['Atrasos (Informativo)'] = df_rank['Atrasos (Informativo)'].apply(lambda x: f"⚠️ {x} atrasos" if x > 0 else "🟢 OK")
+
                         if mvp_nome:
-                            st.markdown(f"""<div class="mvp-card"><div style="font-size: 1rem; opacity: 0.8; text-transform: uppercase;">⭐ Destaque do Período ⭐</div><div style="font-size: 2.5rem; font-weight: 800; margin: 10px 0;">{mvp_nome}</div><div style="font-size: 0.9rem;">Melhor equilíbrio entre TMA, TMIA e Satisfação</div></div>""", unsafe_allow_html=True)
+                            st.markdown(f"""<div class="mvp-card"><div style="font-size: 1rem; opacity: 0.8; text-transform: uppercase;">⭐ Destaque do Período ⭐</div><div style="font-size: 2.5rem; font-weight: 800; margin: 10px 0;">{mvp_nome}</div><div style="font-size: 0.9rem;">Melhor equilíbrio rigoroso entre TMA, TMIA e Satisfação</div></div>""", unsafe_allow_html=True)
 
                         st.markdown("### 🚀 Top Produtividade (Volume)")
                         render_podium("Campeões de Volume", lista_rank, "Volume", "")
@@ -2144,7 +2239,7 @@ else:
                         st.markdown("---")
                         
                         st.markdown("#### 📊 Tabela Geral de Desempenho (Todos os Tempos)")
-                        df_display = df_rank[['Agente', 'Volume', 'TMA', 'TME', 'TMIA', 'TMIC', 'CSAT Score', 'CSAT Qtd']].sort_values(by="Volume", ascending=False)
+                        df_display = df_rank[['Agente', 'Volume', 'TMA', 'TME', 'TMIA', 'TMIC', 'CSAT Score', 'CSAT Qtd', 'Atrasos (Informativo)']].sort_values(by="Volume", ascending=False)
                         st.dataframe(df_display, column_config={"CSAT Score": st.column_config.NumberColumn("CSAT Score", format="%.2f%%")}, use_container_width=True, hide_index=True)
 
                         st.markdown("---")
@@ -2166,8 +2261,8 @@ else:
 
         # ABA 3: PAUSAS
         with abas_sup[2]:
-            if token and mapa_agentes:
-                lista_curtas, lista_almoco, lista_logins, lista_ranking = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes)
+            if token and 'mapa_agentes_filtrado' in locals():
+                lista_curtas, lista_almoco, lista_logins, lista_ranking = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes_filtrado)
                 c_p1, c_p2 = st.columns(2)
                 with c_p1:
                     st.subheader("1. 🚨 Risco de Estouro (Manhã/Tarde)")
@@ -2195,7 +2290,7 @@ else:
                 st.markdown("---")
                 st.subheader("5. ⏳ Monitoramento de Pré-Pausas (Agendadas)")
                 with st.spinner("Buscando pré-pausas..."):
-                    lista_pre_pausas = processar_dados_pre_pausas_geral(token, d_inicial, d_final, mapa_agentes)
+                    lista_pre_pausas = processar_dados_pre_pausas_geral(token, d_inicial, d_final, mapa_agentes_filtrado)
                     if lista_pre_pausas:
                         df_pre = pd.DataFrame(lista_pre_pausas)
                         contagem = df_pre['Agente'].value_counts()
@@ -2216,10 +2311,23 @@ else:
                 if st.button("🔄 Atualizar Lista Online"): st.rerun()
                 
                 if setor_atual == "NRC":
-                    lista_online = buscar_agentes_online_filtrado_nrc(token)
+                    lista_online_bruta = buscar_agentes_online_filtrado_nrc(token)
                 else:
-                    lista_online = buscar_agentes_online_filtrado_setor(token, setor_atual)
+                    lista_online_bruta = buscar_agentes_online_filtrado_setor(token, setor_atual)
                 
+                lista_online = []
+                lista_exclusao = [x.strip().upper() for x in (JOVENS_APRENDIZES_NRC if setor_atual == "NRC" else JOVENS_APRENDIZES_SUPORTE)]
+                
+                for agente_online in lista_online_bruta:
+                    nome_online = str(agente_online.get("nom_agente", "")).upper()
+                    is_excluido = False
+                    for alvo in lista_exclusao:
+                        if alvo in nome_online.split() or (" " in alvo and alvo in nome_online): 
+                            is_excluido = True
+                            break
+                    if not is_excluido:
+                        lista_online.append(agente_online)
+
                 if lista_online:
                     st.markdown(f"### 🟢 {len(lista_online)} Agentes Online ({setor_atual})")
                     for agente_online in lista_online:
@@ -2255,7 +2363,7 @@ else:
                                         time.sleep(1); st.rerun()
                                     else: st.error(msg_logout)
                 else:
-                    st.warning(f"Nenhum agente da equipe {setor_atual} está online no momento.")
+                    st.warning(f"Nenhum agente regular da equipe {setor_atual} está online no momento.")
             else: st.error("Erro de conexão.")
 
         # ABA 5: SOLICITAÇÕES
@@ -2268,7 +2376,7 @@ else:
         with abas_sup[5]:
             st.markdown("### 📝 Diário de Bordo da Supervisão")
             with st.form("form_diario_bordo"):
-                lista_agentes_diario = ["Geral (Equipe)"] + sorted(list(mapa_agentes.values())) if 'mapa_agentes' in locals() else ["Geral (Equipe)"]
+                lista_agentes_diario = ["Geral (Equipe)"] + sorted(list(mapa_agentes_sidebar.values())) if 'mapa_agentes_sidebar' in locals() else ["Geral (Equipe)"]
                 col_d1, col_d2 = st.columns(2)
                 with col_d1: agente_selecionado = st.selectbox("Agente Relacionado", lista_agentes_diario)
                 with col_d2: tipo_ponto = st.selectbox("Tipo de Registro", ["Advertência", "Atestado/Falta", "Feedback Comportamental", "Feedback Técnico", "Elogio/Destaque", "Problema Sistêmico", "Outros"])
