@@ -153,14 +153,14 @@ NOMES_COMUNS_PRIMEIRO = ['MARIA', 'ANNA', 'JULIA', 'ERICA']
 # ==============================================================================
 # 1.1 CONFIGURAÇÃO DE NOVOS SETORES (ATUALIZADO COM JOVENS APRENDIZES)
 # ==============================================================================
-JOVENS_APRENDIZES_SUPORTE = ['GAELL', 'LUYLLA', 'SHANNA', 'RUAN JA']
+JOVENS_APRENDIZES_SUPORTE = ['GAELL', 'LUYLLA', 'RUAN JA', 'NOVAIS']
 JOVENS_APRENDIZES_NRC = ['CICERA', 'RIBEIRO', 'SILVA', 'NUNES']
 
 SETORES_AGENTES = {
     "NRC": LISTA_NRC + JOVENS_APRENDIZES_NRC, 
     "CANCELAMENTO": ['BARBOSA', 'ELOISA', 'LARISSA', 'EDUARDO', 'CAMILA', 'SAMARA'],
     "NEGOCIACAO": ['Carla', 'Lenk', 'Ana Luiza', 'JULIETTI', 'RODRIGO', 'Monalisa', 'Ramom', 'Ednael', 'Leticia', 'Rita', 'Mariana', 'Flavia s', 'Uri', 'Clara', 'Wanderson', 'Aparecida', 'Cristina', 'Caio', 'LUKAS'],
-    "SUPORTE": ['VALERIO', 'TARCISIO', 'GRANJA', 'ALICE', 'FERNANDO', 'SANTOS', 'RENAN', 'FERREIRA', 'HUEMILLY', 'LOPES', 'LAUDEMILSON', 'RAYANE', 'LAYS', 'JORGE', 'LIGIA', 'ALESSANDRO', 'GEIBSON', 'ROBERTO', 'OLIVEIRA', 'MAURÍCIO', 'AVOLO', 'CLEBER', 'ROMERIO', 'JUNIOR', 'ISABELA', 'WAGNER', 'CLAUDIA', 'ANTONIO', 'JOSE', 'LEONARDO', 'KLEBSON', 'OZENAIDE', 'ALEXANDER', 'VITORIA', 'ANA L.', 'MELISON', 'TAYNARA', 'RAFAELA' ] + JOVENS_APRENDIZES_SUPORTE
+    "SUPORTE": ['VALERIO', 'TARCISIO', 'GRANJA', 'ALICE', 'FERNANDO', 'SANTOS', 'RENAN', 'FERREIRA', 'HUEMILLY', 'LOPES', 'LAUDEMILSON', 'RAYANE', 'LAYS', 'JORGE', 'LIGIA', 'ALESSANDRO', 'GEIBSON', 'ROBERTO', 'OLIVEIRA', 'MAURÍCIO', 'AVOLO', 'CLEBER', 'JUNIOR', 'ISABELA', 'WAGNER', 'ANTONIO', 'JOSE', 'LEONARDO', 'KLEBSON', 'OZENAIDE', 'ALEXANDER', 'VITORIA', 'ANA L.', 'MELISON', 'TAYNARA', 'RAFAELA', 'SHANNA' ] + JOVENS_APRENDIZES_SUPORTE
 }
 
 SETORES_SERVICOS = {
@@ -492,6 +492,10 @@ def buscar_agentes_online_filtrado_nrc(token):
                     if " " in alvo and alvo in nome_full: match_encontrado = True; break
                 
                 if match_encontrado:
+                    if "LETICIA B." in nome_full or "LETICIA B" in nome_full:
+                        match_encontrado = False
+
+                if match_encontrado:
                     agentes_online_nrc.append(agente)
     except: pass
     return agentes_online_nrc
@@ -536,6 +540,10 @@ def buscar_dados_completos_supervisor(token, data_ini, data_fim, contas_selecion
                     if alvo in partes_nome: match_encontrado = True; break
                     if alvo in NOMES_COMUNS_PRIMEIRO and alvo == partes_nome[0]: match_encontrado = True; break
                     if " " in alvo and alvo in nome_upper: match_encontrado = True; break
+
+                if match_encontrado:
+                    if "LETICIA B." in nome_upper or "LETICIA B" in nome_upper:
+                        match_encontrado = False
 
                 if match_encontrado: 
                     cod = str(agente.get("cod_agente"))
@@ -733,6 +741,7 @@ def _processar_agente_pausas(token, cod_agente, nome_agente, data_ini, data_fim)
             rows = r.json().get("rows", [])
             if not rows: break
             pausas_agente.extend(rows)
+            if len(rows) < 100: break
             pagina += 1
         except: break
     
@@ -783,6 +792,7 @@ def _processar_agente_pausas(token, cod_agente, nome_agente, data_ini, data_fim)
             rows = r.json().get("rows", [])
             if not rows: break
             logins_raw.extend(rows)
+            if len(rows) < 100: break
             page_log += 1
         except: break
         
@@ -900,49 +910,60 @@ def processar_ranking_geral(token, data_ini, data_fim, mapa_agentes, contas_sele
                             dados_stats[cod_match]["TMIC"].append(item.get("tmic", "--:--"))
         except: pass
 
-    def _fetch_csat_agente(cod_ag):
-        pos, tot = 0, 0
-        for pid in PESQUISAS_IDS:
-            for conta in contas_selecionadas:
-                pg = 1
-                while True:
-                    pars = {"data_inicial": data_ini, "data_final": data_fim, "pesquisa": pid, "id_conta": conta, "limit": 1000, "page": pg, "agente[]": [cod_ag]}
-                    try:
-                        rr = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=pars)
-                        time.sleep(0.5)
-                        if rr.status_code != 200: break
-                        dd = rr.json()
-                        if not dd or not isinstance(dd, list): break
-                        found_pg = False
-                        for b in dd:
-                            if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
-                                found_pg = True
-                                for rsp in b.get("respostas", []):
-                                    try:
+    # ==============================================================================
+    # 🚀 OTIMIZAÇÃO: BUSCA EM LOTE (BULK) DE CSAT PARA REDUZIR AS REQUISIÇÕES
+    # ==============================================================================
+    dados_csat = {cod: {"pos": 0, "tot": 0} for cod in ids_validos}
+    
+    for pid in PESQUISAS_IDS:
+        for conta in contas_selecionadas:
+            pg = 1
+            while True:
+                pars = {
+                    "data_inicial": data_ini, 
+                    "data_final": data_fim, 
+                    "pesquisa": pid, 
+                    "id_conta": conta, 
+                    "limit": 1000, 
+                    "page": pg, 
+                    "agente[]": ids_validos # Passando o array inteiro de uma vez!
+                }
+                try:
+                    rr = requests.get(f"{BASE_URL}/RelPesqAnalitico", headers=headers, params=pars)
+                    time.sleep(0.5)
+                    if rr.status_code != 200: break
+                    dd = rr.json()
+                    if not dd or not isinstance(dd, list): break
+                    
+                    found_pg = False
+                    total_k = 0
+                    
+                    for b in dd:
+                        if str(b.get("id_pergunta","")) in IDS_PERGUNTAS_VALIDAS:
+                            found_pg = True
+                            if b.get("sintetico"): total_k += sum(int(x.get("num_quantidade", 0)) for x in b["sintetico"])
+                            for rsp in b.get("respostas", []):
+                                try:
+                                    nom_ag = str(rsp.get("nom_agente", "")).upper()
+                                    cod_match = next((c for c, n in mapa_agentes.items() if n == nom_ag or n in nom_ag), None)
+                                    if cod_match:
                                         val = float(rsp.get("nom_valor", -1))
                                         if val >= 0:
-                                            tot += 1
-                                            if val >= 8: pos += 1
-                                    except: pass
-                        if not found_pg and len(dd) < 5: break
-                        if len(dd) < 100: break
-                        pg += 1
-                    except: break
-        return pos, tot
-
-    dados_csat = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futs = {executor.submit(_fetch_csat_agente, cod): cod for cod in ids_validos}
-        for f in concurrent.futures.as_completed(futs):
-            cod = futs[f]
-            try:
-                p, t = f.result()
-                dados_csat[cod] = (p, t)
-            except: dados_csat[cod] = (0, 0)
+                                            dados_csat[cod_match]["tot"] += 1
+                                            if val >= 8: dados_csat[cod_match]["pos"] += 1
+                                except: pass
+                                
+                    if (pg * 1000) >= total_k: break
+                    if not found_pg and len(dd) < 5: break
+                    if len(dd) < 100: break
+                    pg += 1
+                except: break
             
     for cod, nome in mapa_agentes.items():
         st_data = dados_stats[cod]
-        pos, tot = dados_csat.get(cod, (0, 0))
+        d_csat = dados_csat.get(cod, {"pos": 0, "tot": 0})
+        pos = d_csat["pos"]
+        tot = d_csat["tot"]
         score = (pos/tot*100) if tot > 0 else 0.0
         
         vol_final = st_data["Vol"]
@@ -1013,6 +1034,10 @@ def buscar_agentes_online_filtrado_setor(token, setor_nome):
                     if " " in alvo and alvo in nome_full: match_encontrado = True; break
                 
                 if match_encontrado:
+                    if "LETICIA B." in nome_full or "LETICIA B" in nome_full:
+                        match_encontrado = False
+
+                if match_encontrado:
                     agentes_online_filtrados.append(agente)
     except: pass
     return agentes_online_filtrados
@@ -1048,6 +1073,10 @@ def buscar_dados_supervisor_multisetor(token, data_ini, data_fim, setor_nome, co
                     if alvo in NOMES_COMUNS_PRIMEIRO and alvo == partes_nome[0]: match_encontrado = True; break
                     if " " in alvo and alvo in nome_upper: match_encontrado = True; break
                     
+                if match_encontrado: 
+                    if "LETICIA B." in nome_upper or "LETICIA B" in nome_upper:
+                        match_encontrado = False
+
                 if match_encontrado: 
                     cod = str(agente.get("cod_agente"))
                     ids_agentes.append(cod)
