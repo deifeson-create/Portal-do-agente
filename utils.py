@@ -46,9 +46,21 @@ def calcular_media_tempos(lista_tempos, lista_pesos):
     return f"{hrs:02d}:{mins:02d}:{segs:02d}"
 
 def gerar_link_protocolo(protocolo):
-    """Gera o link dinâmico para auditoria na Matrix."""
-    proto_limpo = str(protocolo).strip()
-    return f"https://atel.matrixdobrasil.ai/#/atendimento-view?protocolo={proto_limpo}"
+    """
+    Gera o link de acesso direto ao atendimento na Matrix.
+    Usa os últimos 7 dígitos do protocolo (cod_atendimento).
+    """
+    if not protocolo or pd.isna(protocolo):
+        return ""
+    
+    # Converte para string e limpa espaços
+    protocolo_str = str(protocolo).replace(".0", "").strip()
+    
+    # Extrai os últimos 7 dígitos (que é o cod_atendimento real)
+    cod_atendimento = protocolo_str[-7:] if len(protocolo_str) >= 7 else protocolo_str
+    
+    # Monta a URL no novo formato exigido pela Matrix
+    return f"https://ateltelecom.matrixdobrasil.ai/atendimento/view/cod_atendimento/{cod_atendimento}/readonly/true#atendimento-div"
 
 def eleger_melhor_do_mes(df_rank):
     """
