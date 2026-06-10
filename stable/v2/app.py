@@ -1,26 +1,22 @@
 import streamlit as st
 import pandas as pd
-import requests
 import time
 from datetime import datetime, timedelta
 from collections import defaultdict
 
 # ==============================================================================
-# IMPORTAÇÃO DOS MÓDULOS
+# IMPORTAÇÃO DOS MÓDULOS (ARQUITETURA SEGMENTADA)
 # ==============================================================================
 from config import (
-    BASE_URL,
     SUPERVISOR_LOGIN, SUPERVISOR_PASS,
     SUPERVISOR_CANCELAMENTO_LOGIN, SUPERVISOR_CANCELAMENTO_PASS,
     SUPERVISOR_SUPORTE_LOGIN, SUPERVISOR_SUPORTE_PASS,
     SUPERVISOR_NEGOCIACAO_LOGIN, SUPERVISOR_NEGOCIACAO_PASS,
-    SUPERVISOR_CS_LOGIN, SUPERVISOR_CS_PASS,
     MASTER_LOGIN, MASTER_PASS,
     ID_CONTA, CONTAS_DISPONIVEIS, SETORES_AGENTES_IDS, SERVICOS_ALVO, SETORES_SERVICOS,
     LIMITES_PAUSA, TOLERANCIA_MENSAL_EXCESSO, TOLERANCIA_VISUAL_ALMOCO,
     JOVENS_APRENDIZES_NRC_IDS, JOVENS_APRENDIZES_SUPORTE_IDS
 )
-
 from gsheets import (
     salvar_solicitacao_gsheets, salvar_diario_bordo,
     ler_solicitacoes_gsheets, ler_diario_bordo
@@ -125,12 +121,14 @@ def barra_lateral_com_changelog():
         else: d_ini = st.date_input("Início", hoje-timedelta(1)); d_fim = st.date_input("Fim", hoje)
         st.info(f"De: {d_ini.strftime('%d/%m')} até {d_fim.strftime('%d/%m')}")
         st.markdown("---")
-        with st.expander("📜 Versão Platinum 19.0"):
+        with st.expander("📜 Versão Platinum 18.0"):
             st.markdown("""
-            **v19.0 - Portal do Callcenter**
-            - **Novo Painel CS:** Área analítica exclusiva do Customer Success consolidando a saúde de todos os setores.
-            - **Correção da Base de Dados:** Sistema atualizado para tratar quebra de nomes vindos da Matrix.
-            - **Acesso ao Ticket:** Hiperlinks automatizados nos feedbacks para abrir o atendimento na janela da Matrix usando a arquitetura de protocolo atual.
+            **v18.0 - Portal do Callcenter**
+            - **Renomeação do Sistema:** O painel chama-se oficialmente Portal do Callcenter.
+            - **Novas Regras de Pausas:** Implementação inteligente de coexistência das Pausas 1, 2 e 3 com o padrão antigo de limites.
+            - **Aba de Feedbacks Corrigida:** A nota de satisfação agora processa os detratores reais (menores que 8) de forma isolada.
+            - **Cards para os Aprendizes:** Feedbacks abertos qualitativos agora são exibidos em cards visuais modernos também na aba Jovem Aprendiz.
+            - **Satisfação Unificada Suporte:** Novo card consolidando o CSAT total do setor (Dia, Plantão e Aprendizes juntos).
             """)
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.auth_status = False; st.session_state.user_data = None; st.rerun()
@@ -180,12 +178,6 @@ if not st.session_state.auth_status:
                     st.session_state.user_setor = "NEGOCIACAO"
                     st.session_state.user_data = {"nome": "Supervisor Negociação", "id": "SUPERVISOR_NEG"}
                     st.rerun()
-                elif usuario == SUPERVISOR_CS_LOGIN and senha == SUPERVISOR_CS_PASS:
-                    st.session_state.auth_status = True
-                    st.session_state.user_role = "cs"
-                    st.session_state.user_setor = "CS"
-                    st.session_state.user_data = {"nome": "Customer Success", "id": "CS_TEAM"}
-                    st.rerun()
                 elif usuario == MASTER_LOGIN and senha == MASTER_PASS:
                     st.session_state.auth_status = True
                     st.session_state.user_role = "master"
@@ -215,7 +207,7 @@ else:
         setor_atual = setor_selecionado
 
     contas_selecionadas = [str(ID_CONTA)]
-    if st.session_state.user_role in ["supervisor", "master", "cs"]:
+    if st.session_state.user_role in ["supervisor", "master"]:
         st.sidebar.markdown("---")
         st.sidebar.header("🏢 Filtro de Contas")
         opcoes_contas = [f"{cod} - {nome}" for cod, nome in CONTAS_DISPONIVEIS.items()]
@@ -254,156 +246,11 @@ else:
             for cod, nome in mapa_agentes_sidebar.items():
                 if nome == opcao_agente:
                     id_alvo = cod; nome_alvo = nome; break
-
-    # --------------------------------------------------------------------------
-    # PAINEL CUSTOMER SUCCESS (VISÃO PANORÂMICA)
-    # --------------------------------------------------------------------------
-    if st.session_state.user_role == "cs":
-        st.markdown("## 🌟 Painel Customer Success (Visão Global)")
-        st.info("Monitorização de Saúde e Feedbacks de todas as equipes de atendimento.")
-        
-        abas_cs = st.tabs(["📊 Satisfação por Setor", "💬 Feedbacks Abertos (Global)"])
-        
-        if token:
-            with st.spinner("A mapear matriz de agentes e consolidar resultados..."):
-                
-                # 1. Constrói um super dicionário com TODOS os agentes de TODOS os setores
-                mapa_todos_agentes = {}
-                mapa_agente_setor = {}
-                headers = {"Authorization": f"Bearer {token}"}
-                pagina = 1
-                
-                while True:
-                    try:
-                        r = requests.get(f"{BASE_URL}/agentes", headers=headers, params={"limit": 100, "page": pagina, "bol_cancelado": 0})
-                        if r.status_code != 200: break
-                        data = r.json()
-                        if not data.get("result"): break
-                        for ag in data["result"]:
-                            cod = str(ag.get("cod_agente"))
-                            nome = str(ag.get("nome_exibicao") or ag.get("agente")).strip().upper()
-                            
-                            # Verifica a qual setor este ID pertence
-                            setor_pertencente = "Outros"
-                            for nome_setor, lista_ids in SETORES_AGENTES_IDS.items():
-                                if cod in lista_ids:
-                                    setor_pertencente = nome_setor
-                                    break
-                            
-                            if setor_pertencente != "Outros":
-                                mapa_todos_agentes[cod] = nome
-                                mapa_agente_setor[nome] = setor_pertencente
-                                
-                        if pagina * 100 >= data.get("total", 0): break
-                        pagina += 1
-                    except: break
-                
-                # 2. Puxa todos os feedbacks usando esse super dicionário
-                lista_feedbacks_global = buscar_dados_satisfacao(token, d_inicial, d_final, contas_tuple, mapa_todos_agentes)
-                
-                if lista_feedbacks_global:
-                    df_fb_global = pd.DataFrame(lista_feedbacks_global)
-                    # Adiciona a coluna do Setor no DataFrame cruzando com o dicionário
-                    df_fb_global["Setor"] = df_fb_global["Agente"].map(mapa_agente_setor).fillna("Outros")
-                    
-                    # --- ABA 1: CSAT CONSOLIDADO ---
-                    with abas_cs[0]:
-                        st.markdown("### 📈 Termômetro Geral (CSAT)")
-                        df_notas = df_fb_global.dropna(subset=["Nota"])
-                        
-                        num_colunas = len(SETORES_AGENTES_IDS)
-                        colunas_kpi = st.columns(num_colunas)
-                        
-                        for idx, setor in enumerate(SETORES_AGENTES_IDS.keys()):
-                            with colunas_kpi[idx]:
-                                df_setor = df_notas[df_notas["Setor"] == setor]
-                                total_setor = len(df_setor)
-                                pos_setor = len(df_setor[df_setor["Nota"] >= 8])
-                                score_setor = (pos_setor / total_setor * 100) if total_setor > 0 else 0.0
-                                
-                                cor_setor = "#10b981" if score_setor >= 80 else ("#f59e0b" if score_setor >= 70 else "#ef4444")
-                                render_kpi_card(f"CSAT {setor}", f"{score_setor:.2f}%", f"Base de Respostas: {total_setor}", cor_setor)
-                                
-                        st.markdown("---")
-                        st.markdown("#### 🚨 Raio-X Rápido de Detratores")
-                        st.info("Abaixo estão os setores com maior volume de avaliações negativas (Notas Menores que 8).")
-                        detratores_totais = df_notas[df_notas["Nota"] < 8].copy()
-                        if not detratores_totais.empty:
-                            agrupado = detratores_totais.groupby("Setor").size().reset_index(name="Volume Detratores")
-                            agrupado = agrupado.sort_values(by="Volume Detratores", ascending=False)
-                            st.dataframe(agrupado, use_container_width=True, hide_index=True)
-                        else:
-                            st.success("Nenhum detrator registrado neste período em nenhuma das equipes!")
-                    
-                    # --- ABA 2: FEEDBACKS ABERTOS ---
-                    with abas_cs[1]:
-                        st.markdown("### 💬 Central Analítica de Feedbacks")
-                        
-                        c_f1, c_f2, c_f3 = st.columns(3)
-                        with c_f1:
-                            filtro_setor_cs = st.selectbox("Filtrar Equipe:", ["Todos os Setores"] + list(SETORES_AGENTES_IDS.keys()))
-                        with c_f2:
-                            filtro_nota_cs = st.selectbox("Status:", ["Todas as Notas", "Apenas Detratores (< 8)", "Apenas Promotores (≥ 8)"])
-                        with c_f3:
-                            filtro_texto_cs = st.selectbox("Comentários:", ["Apenas com texto escrito", "Todos os atendimentos"])
-                            
-                        df_view = df_fb_global.copy()
-                        if filtro_setor_cs != "Todos os Setores":
-                            df_view = df_view[df_view["Setor"] == filtro_setor_cs]
-                            
-                        if filtro_nota_cs == "Apenas Detratores (< 8)":
-                            df_view = df_view[df_view["Nota"] < 8]
-                        elif filtro_nota_cs == "Apenas Promotores (≥ 8)":
-                            df_view = df_view[df_view["Nota"] >= 8]
-                            
-                        if filtro_texto_cs == "Apenas com texto escrito":
-                            df_view = df_view[df_view["Comentario"].str.strip() != ""]
-                            
-                        st.markdown(f"<p style='color: #9ca3af;'>Exibindo {len(df_view)} resultados baseados nos seus filtros.</p>", unsafe_allow_html=True)
-                        
-                        if not df_view.empty:
-                            for _, row in df_view.sort_values(by="Data", ascending=False).iterrows():
-                                nota_val = row["Nota"]
-                                css_nota = "nota-baixa"
-                                if pd.isna(nota_val): 
-                                    nota_val = "?"
-                                    css_nota = "nota-media"
-                                elif nota_val >= 8: 
-                                    css_nota = "nota-alta"
-                                
-                                link_matrix = gerar_link_protocolo(row["Protocolo"])
-                                
-                                st.markdown(f"""
-                                <div class="feedback-card">
-                                    <div class="feedback-header">
-                                        <div>
-                                            <div style="color: #9ca3af; font-size: 0.8rem;">{row["Data"]} • Protocolo: {row["Protocolo"]}</div>
-                                            <div style="font-weight: 600; font-size: 1.1rem; color: #f3f4f6;">{row["Cliente"]}</div>
-                                            <div style="color: #6366f1; font-size: 0.9rem; margin-top: 2px;">Atendido por: {row["Agente"]} ({row["Setor"]}) • {row["Servico"]}</div>
-                                        </div>
-                                        <div class="feedback-nota {css_nota}">★ {nota_val}</div>
-                                    </div>
-                                    <div class="feedback-body">
-                                        "{row["Comentario"]}"
-                                    </div>
-                                    <div style="margin-top: 10px; text-align: right;">
-                                        <a href="{link_matrix}" target="_blank" style="text-decoration: none; color: #3b82f6; font-size: 0.85rem; font-weight: bold;">
-                                            🔗 Abrir Atendimento
-                                        </a>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.warning("Nenhum feedback encontrado com as combinações selecionadas.")
-                else:
-                    st.info("Nenhuma pesquisa de satisfação rastreada na API para este período.")
-        else:
-            st.error("Sem conexão com a API da Matrix.")
-
+    
     # --------------------------------------------------------------------------
     # PAINEL AGENTE / VISÃO INDIVIDUAL
     # --------------------------------------------------------------------------
-    elif st.session_state.user_role == "agente" or ((st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Individual"):
+    if st.session_state.user_role == "agente" or ((st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Individual"):
         
         if st.session_state.user_role == "agente":
             target_id = st.session_state.user_data['id']

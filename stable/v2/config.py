@@ -21,10 +21,6 @@ try:
     SUPERVISOR_NEGOCIACAO_LOGIN = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_LOGIN", "admin_neg")
     SUPERVISOR_NEGOCIACAO_PASS = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_PASS", "senha_neg")
 
-    # NOVO: Acesso para o Customer Success (CS)
-    SUPERVISOR_CS_LOGIN = st.secrets["auth"].get("SUPERVISOR_CS_LOGIN", "admin_cs")
-    SUPERVISOR_CS_PASS = st.secrets["auth"].get("SUPERVISOR_CS_PASS", "senha_cs123")
-
     MASTER_LOGIN = st.secrets["auth"].get("MASTER_LOGIN", "master_admin")
     MASTER_PASS = st.secrets["auth"].get("MASTER_PASS", "master_senha")
     

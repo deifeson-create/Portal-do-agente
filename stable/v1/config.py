@@ -21,21 +21,11 @@ try:
     SUPERVISOR_NEGOCIACAO_LOGIN = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_LOGIN", "admin_neg")
     SUPERVISOR_NEGOCIACAO_PASS = st.secrets["auth"].get("SUPERVISOR_NEGOCIACAO_PASS", "senha_neg")
 
-    # NOVO: Acesso para o Customer Success (CS)
-    SUPERVISOR_CS_LOGIN = st.secrets["auth"].get("SUPERVISOR_CS_LOGIN", "admin_cs")
-    SUPERVISOR_CS_PASS = st.secrets["auth"].get("SUPERVISOR_CS_PASS", "senha_cs123")
-
     MASTER_LOGIN = st.secrets["auth"].get("MASTER_LOGIN", "master_admin")
     MASTER_PASS = st.secrets["auth"].get("MASTER_PASS", "master_senha")
     
     PESQUISAS_IDS = st.secrets["ids"]["PESQUISAS_IDS"]
     IDS_PERGUNTAS_VALIDAS = st.secrets["ids"]["IDS_PERGUNTAS_VALIDAS"]
-    
-    # NOVAS VARIÁVEIS DA ABA DE SATISFAÇÃO (Obrigatórias no secrets)
-    PESQUISA_SATISFACAO = str(st.secrets["ids"]["PESQUISA_SATISFACAO"])
-    PERGUNTA_NOTA = str(st.secrets["ids"]["PERGUNTA_NOTA"])
-    PERGUNTA_TEXTO = str(st.secrets["ids"]["PERGUNTA_TEXTO"])
-    
 except Exception as erro:
     st.error(f"⚠️ Erro crítico: Não foi possível carregar os Segredos (Secrets). Verifique a configuração no Streamlit Cloud. Detalhe: {erro}")
     st.stop()
@@ -71,15 +61,8 @@ SETORES_SERVICOS = {
 LISTA_PLANTAO_IDS = ['221', '219', '151', '233', '197']
 ID_CONTA_CLIENTE_INTERNO = "5"
 
-# ==============================================================================
-# REGRAS DE PAUSA MISTAS (ANTIGAS + NOVAS)
-# ==============================================================================
-LIMITES_PAUSA = { 
-    "CURTA_ANTIGA": 15.0,  # Antigas (Manhã, Tarde, Noite)
-    "LONGA_ANTIGA": 120.0, # Antigo Almoço/Plantão
-    "PAUSA_1_3": 10.0,     # Novas Pausas Curtas (Pausa 1 e Pausa 3)
-    "PAUSA_2": 20.0        # Nova Pausa Longa (Pausa 2 / Almoço novo)
-}
+# REGRAS DE PAUSA
+LIMITES_PAUSA = { "CURTA": 15.0, "LONGA": 120.0 }
 TOLERANCIA_MENSAL_EXCESSO = 20.0 
 TOLERANCIA_VISUAL_ALMOCO = 2.0
 

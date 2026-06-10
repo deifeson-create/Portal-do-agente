@@ -1,26 +1,22 @@
 import streamlit as st
 import pandas as pd
-import requests
 import time
 from datetime import datetime, timedelta
 from collections import defaultdict
 
 # ==============================================================================
-# IMPORTAÇÃO DOS MÓDULOS
+# IMPORTAÇÃO DOS MÓDULOS (ARQUITETURA SEGMENTADA)
 # ==============================================================================
 from config import (
-    BASE_URL,
     SUPERVISOR_LOGIN, SUPERVISOR_PASS,
     SUPERVISOR_CANCELAMENTO_LOGIN, SUPERVISOR_CANCELAMENTO_PASS,
     SUPERVISOR_SUPORTE_LOGIN, SUPERVISOR_SUPORTE_PASS,
     SUPERVISOR_NEGOCIACAO_LOGIN, SUPERVISOR_NEGOCIACAO_PASS,
-    SUPERVISOR_CS_LOGIN, SUPERVISOR_CS_PASS,
     MASTER_LOGIN, MASTER_PASS,
     ID_CONTA, CONTAS_DISPONIVEIS, SETORES_AGENTES_IDS, SERVICOS_ALVO, SETORES_SERVICOS,
     LIMITES_PAUSA, TOLERANCIA_MENSAL_EXCESSO, TOLERANCIA_VISUAL_ALMOCO,
     JOVENS_APRENDIZES_NRC_IDS, JOVENS_APRENDIZES_SUPORTE_IDS
 )
-
 from gsheets import (
     salvar_solicitacao_gsheets, salvar_diario_bordo,
     ler_solicitacoes_gsheets, ler_diario_bordo
@@ -40,7 +36,7 @@ from api import (
     processar_dados_pre_pausas_geral, buscar_dados_plantao,
     buscar_dados_cliente_interno, buscar_dados_jovem_aprendiz,
     buscar_agentes_online_filtrado_nrc, buscar_agentes_online_filtrado_setor,
-    forcar_logout, buscar_dados_satisfacao, buscar_csat_unificado_suporte
+    forcar_logout
 )
 
 # ==============================================================================
@@ -48,15 +44,17 @@ from api import (
 # ==============================================================================
 st.set_page_config(
     layout="wide",
-    page_title="Portal do Callcenter",
+    page_title="Portal do Agente NRC",
     page_icon="🎧",
     initial_sidebar_state="expanded"
 )
 
+# 🔒 BLOQUEIO DE SEGURANÇA (SENHA MESTRA)
 if "app_unlocked" not in st.session_state:
     st.session_state.app_unlocked = False
 
 def check_master_password():
+    """Verifica a senha mestra antes de carregar o app."""
     if st.session_state.app_unlocked:
         return
 
@@ -80,36 +78,6 @@ def check_master_password():
 check_master_password()
 inject_custom_css()
 
-st.markdown("""
-<style>
-    .feedback-card {
-        background-color: #1f2937;
-        border: 1px solid #374151;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-    }
-    .feedback-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #374151;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
-    }
-    .feedback-nota {
-        font-size: 1.5rem;
-        font-weight: bold;
-        padding: 5px 15px;
-        border-radius: 8px;
-    }
-    .nota-alta { background-color: rgba(16, 185, 129, 0.2); color: #10b981; }
-    .nota-media { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-    .nota-baixa { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; }
-    .feedback-body { font-size: 1rem; color: #e5e7eb; font-style: italic; }
-</style>
-""", unsafe_allow_html=True)
-
 # ==============================================================================
 # MENU LATERAL E COMPONENTES DE TELA
 # ==============================================================================
@@ -125,12 +93,12 @@ def barra_lateral_com_changelog():
         else: d_ini = st.date_input("Início", hoje-timedelta(1)); d_fim = st.date_input("Fim", hoje)
         st.info(f"De: {d_ini.strftime('%d/%m')} até {d_fim.strftime('%d/%m')}")
         st.markdown("---")
-        with st.expander("📜 Versão Platinum 19.0"):
+        with st.expander("📜 Versão Platinum 17.0"):
             st.markdown("""
-            **v19.0 - Portal do Callcenter**
-            - **Novo Painel CS:** Área analítica exclusiva do Customer Success consolidando a saúde de todos os setores.
-            - **Correção da Base de Dados:** Sistema atualizado para tratar quebra de nomes vindos da Matrix.
-            - **Acesso ao Ticket:** Hiperlinks automatizados nos feedbacks para abrir o atendimento na janela da Matrix usando a arquitetura de protocolo atual.
+            **v17.0 - Refatoração Completa de Autenticidade (IDs) e Modularização**
+            - **Segurança de Volumetria:** A coleta de dados do sistema não se baseia mais em nomes comuns ou fragmentos. A integração foi refeita utilizando a **Chave Primária (cod_agente)** para 100% dos setores.
+            - **Prevenção de Roubo de Volume:** Resolução definitiva para conflitos de homônimos (como os casos da Maria, Leticia, Alice, etc.).
+            - **Arquitetura Modular:** O sistema foi dividido em módulos para facilitar a manutenção futura.
             """)
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.auth_status = False; st.session_state.user_data = None; st.rerun()
@@ -180,12 +148,6 @@ if not st.session_state.auth_status:
                     st.session_state.user_setor = "NEGOCIACAO"
                     st.session_state.user_data = {"nome": "Supervisor Negociação", "id": "SUPERVISOR_NEG"}
                     st.rerun()
-                elif usuario == SUPERVISOR_CS_LOGIN and senha == SUPERVISOR_CS_PASS:
-                    st.session_state.auth_status = True
-                    st.session_state.user_role = "cs"
-                    st.session_state.user_setor = "CS"
-                    st.session_state.user_data = {"nome": "Customer Success", "id": "CS_TEAM"}
-                    st.rerun()
                 elif usuario == MASTER_LOGIN and senha == MASTER_PASS:
                     st.session_state.auth_status = True
                     st.session_state.user_role = "master"
@@ -215,7 +177,7 @@ else:
         setor_atual = setor_selecionado
 
     contas_selecionadas = [str(ID_CONTA)]
-    if st.session_state.user_role in ["supervisor", "master", "cs"]:
+    if st.session_state.user_role in ["supervisor", "master"]:
         st.sidebar.markdown("---")
         st.sidebar.header("🏢 Filtro de Contas")
         opcoes_contas = [f"{cod} - {nome}" for cod, nome in CONTAS_DISPONIVEIS.items()]
@@ -254,156 +216,11 @@ else:
             for cod, nome in mapa_agentes_sidebar.items():
                 if nome == opcao_agente:
                     id_alvo = cod; nome_alvo = nome; break
-
-    # --------------------------------------------------------------------------
-    # PAINEL CUSTOMER SUCCESS (VISÃO PANORÂMICA)
-    # --------------------------------------------------------------------------
-    if st.session_state.user_role == "cs":
-        st.markdown("## 🌟 Painel Customer Success (Visão Global)")
-        st.info("Monitorização de Saúde e Feedbacks de todas as equipes de atendimento.")
-        
-        abas_cs = st.tabs(["📊 Satisfação por Setor", "💬 Feedbacks Abertos (Global)"])
-        
-        if token:
-            with st.spinner("A mapear matriz de agentes e consolidar resultados..."):
-                
-                # 1. Constrói um super dicionário com TODOS os agentes de TODOS os setores
-                mapa_todos_agentes = {}
-                mapa_agente_setor = {}
-                headers = {"Authorization": f"Bearer {token}"}
-                pagina = 1
-                
-                while True:
-                    try:
-                        r = requests.get(f"{BASE_URL}/agentes", headers=headers, params={"limit": 100, "page": pagina, "bol_cancelado": 0})
-                        if r.status_code != 200: break
-                        data = r.json()
-                        if not data.get("result"): break
-                        for ag in data["result"]:
-                            cod = str(ag.get("cod_agente"))
-                            nome = str(ag.get("nome_exibicao") or ag.get("agente")).strip().upper()
-                            
-                            # Verifica a qual setor este ID pertence
-                            setor_pertencente = "Outros"
-                            for nome_setor, lista_ids in SETORES_AGENTES_IDS.items():
-                                if cod in lista_ids:
-                                    setor_pertencente = nome_setor
-                                    break
-                            
-                            if setor_pertencente != "Outros":
-                                mapa_todos_agentes[cod] = nome
-                                mapa_agente_setor[nome] = setor_pertencente
-                                
-                        if pagina * 100 >= data.get("total", 0): break
-                        pagina += 1
-                    except: break
-                
-                # 2. Puxa todos os feedbacks usando esse super dicionário
-                lista_feedbacks_global = buscar_dados_satisfacao(token, d_inicial, d_final, contas_tuple, mapa_todos_agentes)
-                
-                if lista_feedbacks_global:
-                    df_fb_global = pd.DataFrame(lista_feedbacks_global)
-                    # Adiciona a coluna do Setor no DataFrame cruzando com o dicionário
-                    df_fb_global["Setor"] = df_fb_global["Agente"].map(mapa_agente_setor).fillna("Outros")
-                    
-                    # --- ABA 1: CSAT CONSOLIDADO ---
-                    with abas_cs[0]:
-                        st.markdown("### 📈 Termômetro Geral (CSAT)")
-                        df_notas = df_fb_global.dropna(subset=["Nota"])
-                        
-                        num_colunas = len(SETORES_AGENTES_IDS)
-                        colunas_kpi = st.columns(num_colunas)
-                        
-                        for idx, setor in enumerate(SETORES_AGENTES_IDS.keys()):
-                            with colunas_kpi[idx]:
-                                df_setor = df_notas[df_notas["Setor"] == setor]
-                                total_setor = len(df_setor)
-                                pos_setor = len(df_setor[df_setor["Nota"] >= 8])
-                                score_setor = (pos_setor / total_setor * 100) if total_setor > 0 else 0.0
-                                
-                                cor_setor = "#10b981" if score_setor >= 80 else ("#f59e0b" if score_setor >= 70 else "#ef4444")
-                                render_kpi_card(f"CSAT {setor}", f"{score_setor:.2f}%", f"Base de Respostas: {total_setor}", cor_setor)
-                                
-                        st.markdown("---")
-                        st.markdown("#### 🚨 Raio-X Rápido de Detratores")
-                        st.info("Abaixo estão os setores com maior volume de avaliações negativas (Notas Menores que 8).")
-                        detratores_totais = df_notas[df_notas["Nota"] < 8].copy()
-                        if not detratores_totais.empty:
-                            agrupado = detratores_totais.groupby("Setor").size().reset_index(name="Volume Detratores")
-                            agrupado = agrupado.sort_values(by="Volume Detratores", ascending=False)
-                            st.dataframe(agrupado, use_container_width=True, hide_index=True)
-                        else:
-                            st.success("Nenhum detrator registrado neste período em nenhuma das equipes!")
-                    
-                    # --- ABA 2: FEEDBACKS ABERTOS ---
-                    with abas_cs[1]:
-                        st.markdown("### 💬 Central Analítica de Feedbacks")
-                        
-                        c_f1, c_f2, c_f3 = st.columns(3)
-                        with c_f1:
-                            filtro_setor_cs = st.selectbox("Filtrar Equipe:", ["Todos os Setores"] + list(SETORES_AGENTES_IDS.keys()))
-                        with c_f2:
-                            filtro_nota_cs = st.selectbox("Status:", ["Todas as Notas", "Apenas Detratores (< 8)", "Apenas Promotores (≥ 8)"])
-                        with c_f3:
-                            filtro_texto_cs = st.selectbox("Comentários:", ["Apenas com texto escrito", "Todos os atendimentos"])
-                            
-                        df_view = df_fb_global.copy()
-                        if filtro_setor_cs != "Todos os Setores":
-                            df_view = df_view[df_view["Setor"] == filtro_setor_cs]
-                            
-                        if filtro_nota_cs == "Apenas Detratores (< 8)":
-                            df_view = df_view[df_view["Nota"] < 8]
-                        elif filtro_nota_cs == "Apenas Promotores (≥ 8)":
-                            df_view = df_view[df_view["Nota"] >= 8]
-                            
-                        if filtro_texto_cs == "Apenas com texto escrito":
-                            df_view = df_view[df_view["Comentario"].str.strip() != ""]
-                            
-                        st.markdown(f"<p style='color: #9ca3af;'>Exibindo {len(df_view)} resultados baseados nos seus filtros.</p>", unsafe_allow_html=True)
-                        
-                        if not df_view.empty:
-                            for _, row in df_view.sort_values(by="Data", ascending=False).iterrows():
-                                nota_val = row["Nota"]
-                                css_nota = "nota-baixa"
-                                if pd.isna(nota_val): 
-                                    nota_val = "?"
-                                    css_nota = "nota-media"
-                                elif nota_val >= 8: 
-                                    css_nota = "nota-alta"
-                                
-                                link_matrix = gerar_link_protocolo(row["Protocolo"])
-                                
-                                st.markdown(f"""
-                                <div class="feedback-card">
-                                    <div class="feedback-header">
-                                        <div>
-                                            <div style="color: #9ca3af; font-size: 0.8rem;">{row["Data"]} • Protocolo: {row["Protocolo"]}</div>
-                                            <div style="font-weight: 600; font-size: 1.1rem; color: #f3f4f6;">{row["Cliente"]}</div>
-                                            <div style="color: #6366f1; font-size: 0.9rem; margin-top: 2px;">Atendido por: {row["Agente"]} ({row["Setor"]}) • {row["Servico"]}</div>
-                                        </div>
-                                        <div class="feedback-nota {css_nota}">★ {nota_val}</div>
-                                    </div>
-                                    <div class="feedback-body">
-                                        "{row["Comentario"]}"
-                                    </div>
-                                    <div style="margin-top: 10px; text-align: right;">
-                                        <a href="{link_matrix}" target="_blank" style="text-decoration: none; color: #3b82f6; font-size: 0.85rem; font-weight: bold;">
-                                            🔗 Abrir Atendimento
-                                        </a>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.warning("Nenhum feedback encontrado com as combinações selecionadas.")
-                else:
-                    st.info("Nenhuma pesquisa de satisfação rastreada na API para este período.")
-        else:
-            st.error("Sem conexão com a API da Matrix.")
-
+    
     # --------------------------------------------------------------------------
     # PAINEL AGENTE / VISÃO INDIVIDUAL
     # --------------------------------------------------------------------------
-    elif st.session_state.user_role == "agente" or ((st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Individual"):
+    if st.session_state.user_role == "agente" or ((st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Individual"):
         
         if st.session_state.user_role == "agente":
             target_id = st.session_state.user_data['id']
@@ -430,11 +247,11 @@ else:
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     cor = "#10b981" if dt_obj and dt_obj.date() == datetime.now().date() else "#3b82f6"
-                    sub = f"Data: {dt_obj.strftime('%d/%m')}" if dt_obj else "Sem registo"
+                    sub = f"Data: {dt_obj.strftime('%d/%m')}" if dt_obj else "Sem registro"
                     render_kpi_card("Primeiro Login", texto_login, sub, cor)
                 with c2: render_kpi_card("Volume Total", str(val_qtd), "Atendimentos Finalizados", "#8b5cf6")
                 with c3:
-                    cor_csat = "#10b981" if csat_score >= 80 else "#f59e0b"
+                    cor_csat = "#10b981" if csat_score >= 85 else "#f59e0b"
                     render_kpi_card("CSAT (Qualidade)", f"{csat_score:.2f}%", f"Base: {csat_qtd} avaliações", cor_csat)
                 
                 c4, c5, c6 = st.columns(3)
@@ -461,25 +278,17 @@ else:
                         nome = str(row['pausa']).upper().strip()
                         duracao = row['Minutos']
                         limite = 0; tipo = "Normal"; excesso = 0.0
-                        
                         if any(x in nome for x in ["MANHA", "MANHÃ", "TARDE", "NOITE"]):
-                            limite = LIMITES_PAUSA["CURTA_ANTIGA"]; tipo = "Penalizável"
-                        elif any(x in nome for x in ["PAUSA 1", "PAUSA 3"]):
-                            limite = LIMITES_PAUSA["PAUSA_1_3"]; tipo = "Penalizável"
-                        elif any(x in nome for x in ["PAUSA 2"]):
-                            limite = LIMITES_PAUSA["PAUSA_2"]; tipo = "Atenção"
+                            limite = LIMITES_PAUSA["CURTA"]; tipo = "Penalizável"
+                            if duracao > limite: excesso = duracao - limite
                         elif any(x in nome for x in ["ALMOÇO", "ALMOCO", "PLANTÃO", "PLANTAO"]):
-                            limite = LIMITES_PAUSA["LONGA_ANTIGA"]; tipo = "Atenção"
-                            
-                        if limite > 0 and duracao > limite:
-                            excesso = duracao - limite
-                            
+                            limite = LIMITES_PAUSA["LONGA"]; tipo = "Atenção"
+                            if duracao > limite: excesso = duracao - limite
                         return pd.Series([tipo, limite, excesso])
                     
                     df_pausas[['Tipo', 'Limite', 'Excesso_Calc']] = df_pausas.apply(calcular_excesso_linha, axis=1)
                     total_excesso_penalizavel = df_pausas[df_pausas['Tipo'] == "Penalizável"]['Excesso_Calc'].sum()
-                    
-                    pausas_longas_criticas = df_pausas[(df_pausas['Tipo'] == "Atenção") & (df_pausas['Excesso_Calc'] > TOLERANCIA_VISUAL_ALMOCO)]
+                    pausas_longas_criticas = df_pausas[(df_pausas['Tipo'] == "Atenção") & (df_pausas['Minutos'] > (LIMITES_PAUSA["LONGA"] + TOLERANCIA_VISUAL_ALMOCO))]
                     
                     kp1, kp2 = st.columns(2)
                     with kp1:
@@ -488,21 +297,21 @@ else:
                         render_kpi_card("Status de Pausas (Mês)", status_msg, f"Tolerância: {TOLERANCIA_MENSAL_EXCESSO} min | Acumulado: {total_excesso_penalizavel:.2f} min", status_cor)
                     with kp2:
                         cor_card_total = "#ef4444" if total_excesso_penalizavel > TOLERANCIA_MENSAL_EXCESSO else ("#f59e0b" if total_excesso_penalizavel > 0 else "#3b82f6")
-                        render_kpi_card("Excesso Penalizável Total", f"{total_excesso_penalizavel:.2f} min", "Soma de minutos excedentes nas pausas curtas", cor_card_total)
+                        render_kpi_card("Excesso Penalizável Total", f"{total_excesso_penalizavel:.2f} min", "Soma dos minutos acima de 15min (Manhã/Tarde/Noite)", cor_card_total)
                     
-                    if not pausas_longas_criticas.empty: st.warning(f"⚠️ Atenção: {len(pausas_longas_criticas)} pausas de Almoço/Plantão/Pausa 2 excederam consideravelmente o limite.")
+                    if not pausas_longas_criticas.empty: st.warning(f"⚠️ Atenção: {len(pausas_longas_criticas)} pausas de Almoço/Plantão excederam consideravelmente o limite.")
                     st.markdown("---")
                     
                     df_view = df_pausas[['data_pausa', 'pausa', 'tempo_pausado', 'Tipo', 'Excesso_Calc']].copy()
                     df_view['Excesso_Calc'] = df_view['Excesso_Calc'].apply(lambda x: f"{x:.2f} min" if x > 0 else "-")
                     df_view.columns = ['Data/Hora', 'Motivo', 'Duração', 'Classificação', 'Tempo Excedido']
                     with st.expander("📋 Relatório Detalhado de Pausas", expanded=True): st.dataframe(df_view, use_container_width=True, hide_index=True)
-                else: st.info("Nenhuma pausa registada no período.")
+                else: st.info("Nenhuma pausa registrada no período.")
             else: st.error("Erro de conexão.")
 
         with abas[2]:
             if df_csat is not None and not df_csat.empty:
-                cor_csat = "#10b981" if csat_score >= 80 else "#f59e0b"
+                cor_csat = "#10b981" if csat_score >= 85 else "#f59e0b"
                 render_kpi_card("Seu CSAT no Período", f"{csat_score:.2f}%", f"{csat_qtd} avaliações", cor_csat)
                 st.markdown("---")
                 st.markdown("#### 📋 Histórico de Avaliações")
@@ -521,10 +330,10 @@ else:
             st.info("Utilize este formulário para solicitar ajustes, enviar denúncias ou pedir ajuda.")
             with st.form("form_suporte"):
                 motivo = st.selectbox("Motivo do Contato", ["Ajuste de Ponto", "Contestação de Pausa", "Denúncia Anônima", "Dúvida/Ajuda", "Outros"])
-                msg = st.text_area("Descreva a sua solicitação com detalhes:", height=150)
+                msg = st.text_area("Descreva sua solicitação com detalhes:", height=150)
                 submitted = st.form_submit_button("Enviar Solicitação", type="primary", use_container_width=True)
                 if submitted:
-                    with st.spinner("A guardar solicitação..."):
+                    with st.spinner("Salvando solicitação..."):
                         if motivo == "Denúncia Anônima": nome_save = "ANÔNIMO"; id_save = "ANÔNIMO"
                         else: nome_save = target_name; id_save = target_id
                         sucesso, retorno = salvar_solicitacao_gsheets(nome_save, id_save, motivo, msg)
@@ -537,8 +346,7 @@ else:
     elif (st.session_state.user_role == "supervisor" or st.session_state.user_role == "master") and modo_visao_supervisor == "Geral":
         st.markdown(f"## 🏢 Painel de Gestão - Setor {setor_atual}")
         
-        lista_abas = ["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações", "📝 Diário de Bordo", "💬 Satisfação"]
-        
+        lista_abas = ["👁️ Visão Geral", "🏆 Rankings", "⏸️ Pausas", "⚡ Tempo Real", "🆘 Solicitações", "📝 Diário de Bordo"]
         if setor_atual in ["NRC", "SUPORTE"]:
             lista_abas.append("👶 Jovem Aprendiz")
             
@@ -547,6 +355,7 @@ else:
             
         abas_sup = st.tabs(lista_abas)
         
+        # Criação do mapa isolado (Sem Jovem Aprendiz) para ser passado para as próximas abas (Ranking, Pausas, Tempo Real)
         mapa_agentes_filtrado = {}
         if 'mapa_agentes_sidebar' in locals():
             ids_exclusao = JOVENS_APRENDIZES_NRC_IDS if setor_atual == "NRC" else JOVENS_APRENDIZES_SUPORTE_IDS
@@ -557,7 +366,7 @@ else:
         # ABA 1: VISÃO GERAL
         with abas_sup[0]:
             if token:
-                with st.spinner("A sincronizar estatísticas..."):
+                with st.spinner("Sincronizando estatísticas..."):
                     
                     if setor_atual == "NRC":
                         dados_servicos, csat_geral, base_geral, mapa_agentes, dados_globais, vol_total_setor = buscar_dados_completos_supervisor(token, d_inicial, d_final, contas_tuple)
@@ -575,26 +384,15 @@ else:
                             texto_vol = "Volumetria Geral NRC" if setor_atual == "NRC" else "Volumetria Geral Suporte (Diurno)"
                             render_kpi_card(texto_vol, str(vol_total_setor), "Soma de todos os serviços", "#6366f1")
 
-                    # CONFIGURAÇÃO DE CARDS DO TOPOCSAT DA VISÃO GERAL
-                    if setor_atual == "SUPORTE":
-                        csat_unificado, base_unificada = buscar_csat_unificado_suporte(token, d_inicial, d_final, contas_tuple)
-                        col_kpi1, col_kpi2 = st.columns(2)
-                        with col_kpi1:
-                            cor_diaria = "#10b981" if csat_geral >= 80 else "#ef4444"
-                            render_kpi_card("CSAT Diurno (Apenas Agentes do Dia)", f"{csat_geral:.2f}%", f"Base Diurna: {base_geral}", cor_diaria)
-                        with col_kpi2:
-                            cor_uni = "#10b981" if csat_unificado >= 80 else "#ef4444"
-                            render_kpi_card("Satisfação Geral Suporte (Unificado)", f"{csat_unificado:.2f}%", f"Base Completa (Dia + Plantão + Aprendizes): {base_unificada}", cor_uni)
-                    else:
-                        col_kpi1, col_kpi2 = st.columns([1, 2])
-                        with col_kpi1:
-                            cor_geral = "#10b981" if csat_geral >= 80 else ("#f59e0b" if csat_geral >= 70 else "#ef4444")
-                            render_kpi_card("CSAT Global (Setor)", f"{csat_geral:.2f}%", f"Base Total: {base_geral}", cor_geral)
-                        with col_kpi2:
-                            if setor_atual == "NRC":
-                                render_link_card("Ferramenta Externa", "https://fideliza-nator-live.streamlit.app/", "FIDELIZA-NATOR")
-                            elif setor_atual == "CANCELAMENTO":
-                                render_link_card("Acesso Rápido", "https://docs.google.com/spreadsheets/d/1y-7_w8RuzE2SSWatbdZj0SjsIa-aJyZCV0_1OxwD7bs/edit?gid=0#gid=0", "CLIENTE CRÍTICO", cor_borda="#ef4444")
+                    col_kpi1, col_kpi2 = st.columns([1, 2])
+                    with col_kpi1:
+                        cor_geral = "#10b981" if csat_geral >= 85 else ("#f59e0b" if csat_geral >= 75 else "#ef4444")
+                        render_kpi_card("CSAT Global (Setor)", f"{csat_geral:.2f}%", f"Base Total: {base_geral}", cor_geral)
+                    with col_kpi2:
+                        if setor_atual == "NRC":
+                            render_link_card("Ferramenta Externa", "https://fideliza-nator-live.streamlit.app/", "FIDELIZA-NATOR")
+                        elif setor_atual == "CANCELAMENTO":
+                            render_link_card("Acesso Rápido", "https://docs.google.com/spreadsheets/d/1y-7_w8RuzE2SSWatbdZj0SjsIa-aJyZCV0_1OxwD7bs/edit?gid=0#gid=0", "CLIENTE CRITICO", cor_borda="#ef4444")
 
                     st.markdown("<br>", unsafe_allow_html=True)
                     c_g1, c_g2, c_g3, c_g4 = st.columns(4)
@@ -616,7 +414,7 @@ else:
                         col1, col2, col3, col4, col5, col6 = st.columns(6)
                         
                         with col1: render_kpi_card("Volume", str(dado.get("num_qtd", 0)), "Atendimentos", "#8b5cf6")
-                        cor_s = "#10b981" if score_s >= 80 else ("#f59e0b" if score_s >= 70 else "#ef4444")
+                        cor_s = "#10b981" if score_s >= 85 else ("#f59e0b" if score_s >= 75 else "#ef4444")
                         with col2: render_kpi_card("Satisfação", f"{score_s:.2f}%", f"Base: {total_s}", cor_s)
                         with col3: render_kpi_card("T.M.A", str(dado.get("tma", "--:--")), "Tempo Médio", "#3b82f6")
                         with col4: render_kpi_card("T.M.E", str(dado.get("tme", "--:--")), "Fila/Espera", "#ef4444")
@@ -626,7 +424,7 @@ else:
                     if setor_atual == "SUPORTE":
                         st.markdown("---")
                         st.markdown("#### 🌙 Visão Global do Plantão (Madrugada)")
-                        st.info("A equipa do plantão atende múltiplos serviços. Abaixo estão os dados consolidados exclusivamente deles.")
+                        st.info("A equipe do plantão atende múltiplos serviços (Comercial, Financeiro, etc.). Abaixo estão os dados consolidados exclusivamente deles.")
                         
                         df_plantao, stats_servico_plantao, _ = buscar_dados_plantao(token, d_inicial, d_final, contas_tuple)
                         vol_total_plantao = df_plantao['Volume'].sum() if not df_plantao.empty else 0
@@ -641,7 +439,7 @@ else:
                             tot_p = dado.get("csat_tot", 0)
                             pos_p = dado.get("csat_pos", 0)
                             score_p = (pos_p / tot_p * 100) if tot_p > 0 else 0.0
-                            cor_p = "#10b981" if score_p >= 80 else ("#f59e0b" if score_p >= 70 else "#ef4444")
+                            cor_p = "#10b981" if score_p >= 85 else ("#f59e0b" if score_p >= 75 else "#ef4444")
                             
                             col1, col2, col3, col4, col5, col6 = st.columns(6)
                             with col1: render_kpi_card("Volume", str(dado.get("num_qtd", 0)), "Atendimentos", "#8b5cf6")
@@ -654,7 +452,7 @@ else:
         # ABA 2: RANKINGS
         with abas_sup[1]:
             if token and 'mapa_agentes_filtrado' in locals():
-                with st.spinner("A calcular o MVP do Mês..."):
+                with st.spinner("Calculando o MVP do Mês..."):
                     lista_rank = processar_ranking_geral(token, d_inicial, d_final, mapa_agentes_filtrado, contas_tuple)
                     _, _, lista_logins, _ = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes_filtrado)
                     
@@ -671,7 +469,7 @@ else:
                         df_rank['Atrasos (Informativo)'] = df_rank['Atrasos (Informativo)'].apply(lambda x: f"⚠️ {x} atrasos" if x > 0 else "🟢 OK")
 
                         if mvp_nome:
-                            st.markdown(f"""<div class="mvp-card"><div style="font-size: 1rem; opacity: 0.8; text-transform: uppercase;">⭐ Destaque do Período ⭐</div><div style="font-size: 2.5rem; font-weight: 800; margin: 10px 0;">{mvp_nome}</div><div style="font-size: 0.9rem;">Melhor equilíbrio com base no confronto direto entre TMA, Ociosidade e CSAT</div></div>""", unsafe_allow_html=True)
+                            st.markdown(f"""<div class="mvp-card"><div style="font-size: 1rem; opacity: 0.8; text-transform: uppercase;">⭐ Destaque do Período ⭐</div><div style="font-size: 2.5rem; font-weight: 800; margin: 10px 0;">{mvp_nome}</div><div style="font-size: 0.9rem;">Melhor equilíbrio rigoroso entre TMA, TMIA e Satisfação</div></div>""", unsafe_allow_html=True)
 
                         st.markdown("### 🚀 Top Produtividade (Volume)")
                         render_podium("Campeões de Volume", lista_rank, "Volume", "")
@@ -710,13 +508,13 @@ else:
                 lista_curtas, lista_almoco, lista_logins, lista_ranking = processar_dados_pausas_supervisor(token, d_inicial, d_final, mapa_agentes_filtrado)
                 c_p1, c_p2 = st.columns(2)
                 with c_p1:
-                    st.subheader("1. 🚨 Risco de Estouro (Curtas)")
+                    st.subheader("1. 🚨 Risco de Estouro (Manhã/Tarde)")
                     if lista_curtas:
                         df_c = pd.DataFrame(lista_curtas).sort_values(by="Valor Num", ascending=False)
                         st.dataframe(df_c[['Agente', 'Excesso Acumulado', 'Status']], use_container_width=True, hide_index=True)
                     else: st.success("Ninguém estourou!")
                 with c_p2:
-                    st.subheader("2. 🍽️ Atrasos de Almoço/Longas")
+                    st.subheader("2. 🍽️ Atrasos de Almoço")
                     if lista_almoco:
                         st.dataframe(pd.DataFrame(lista_almoco), use_container_width=True, hide_index=True)
                     else: st.success("Sem atrasos.")
@@ -733,8 +531,8 @@ else:
                         st.dataframe(pd.DataFrame(lista_ranking).sort_values(by="Qtd Pausas", ascending=False), use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
-                st.subheader("5. ⏳ Monitorização de Pré-Pausas (Agendadas)")
-                with st.spinner("A procurar pré-pausas..."):
+                st.subheader("5. ⏳ Monitoramento de Pré-Pausas (Agendadas)")
+                with st.spinner("Buscando pré-pausas..."):
                     lista_pre_pausas = processar_dados_pre_pausas_geral(token, d_inicial, d_final, mapa_agentes_filtrado)
                     if lista_pre_pausas:
                         df_pre = pd.DataFrame(lista_pre_pausas)
@@ -747,7 +545,7 @@ else:
                             with st.expander(f"➕ {agente} ({qtd} pré-pausas)"):
                                 st.dataframe(df_filtrado[['Início', 'Término', 'Duração', 'Motivo']], use_container_width=True, hide_index=True)
                     else:
-                        st.info("Nenhuma pré-pausa registada no período.")
+                        st.info("Nenhuma pré-pausa registrada no período.")
             else: st.info("Aguarde o carregamento da Visão Geral.")
             
         # ABA 4: TEMPO REAL
@@ -796,21 +594,21 @@ else:
                         col_btn = st.columns([4, 1])[1]
                         with col_btn:
                             if st.button("🔴 Deslogar", key=f"btn_logout_{aid}"):
-                                with st.spinner(f"A deslogar {nome_online}..."):
+                                with st.spinner(f"Deslogando {nome_online}..."):
                                     sucesso_logout, msg_logout = forcar_logout(token, aid)
                                     if sucesso_logout: 
                                         st.success(f"{nome_online} deslogado!")
                                         time.sleep(1); st.rerun()
                                     else: st.error(msg_logout)
                 else:
-                    st.warning(f"Nenhum agente regular da equipa {setor_atual} está online no momento.")
+                    st.warning(f"Nenhum agente regular da equipe {setor_atual} está online no momento.")
             else: st.error("Erro de conexão.")
 
         # ABA 5: SOLICITAÇÕES
         with abas_sup[4]:
             df_gsheets = ler_solicitacoes_gsheets()
             if not df_gsheets.empty: st.dataframe(df_gsheets, use_container_width=True)
-            else: st.warning("Nenhuma solicitação encontrada na folha de cálculo.")
+            else: st.warning("Nenhuma solicitação encontrada na planilha.")
 
         # ABA 6: DIÁRIO DE BORDO
         with abas_sup[5]:
@@ -819,12 +617,12 @@ else:
                 lista_agentes_diario = ["Geral (Equipe)"] + sorted(list(mapa_agentes_sidebar.values())) if 'mapa_agentes_sidebar' in locals() else ["Geral (Equipe)"]
                 col_d1, col_d2 = st.columns(2)
                 with col_d1: agente_selecionado = st.selectbox("Agente Relacionado", lista_agentes_diario)
-                with col_d2: tipo_ponto = st.selectbox("Tipo de Registo", ["Advertência", "Atestado/Falta", "Feedback Comportamental", "Feedback Técnico", "Elogio/Destaque", "Problema Sistémico", "Outros"])
+                with col_d2: tipo_ponto = st.selectbox("Tipo de Registro", ["Advertência", "Atestado/Falta", "Feedback Comportamental", "Feedback Técnico", "Elogio/Destaque", "Problema Sistêmico", "Outros"])
                 texto_diario = st.text_area("Descrição detalhada do ponto:", height=120)
-                btn_diario = st.form_submit_button("💾 Registar no Diário", use_container_width=True)
+                btn_diario = st.form_submit_button("💾 Registrar no Diário", use_container_width=True)
                 if btn_diario:
                     if texto_diario:
-                        with st.spinner("A guardar..."):
+                        with st.spinner("Salvando..."):
                             sucesso_db, msg_db = salvar_diario_bordo(st.session_state.user_data['nome'], setor_atual, agente_selecionado, tipo_ponto, texto_diario)
                             if sucesso_db: st.success(msg_db); time.sleep(1); st.rerun()
                             else: st.error(msg_db)
@@ -833,106 +631,25 @@ else:
             df_diario = ler_diario_bordo(setor_atual if st.session_state.user_role != "master" else None)
             if not df_diario.empty:
                 st.dataframe(df_diario, use_container_width=True, hide_index=True)
-            else: st.warning("Nenhum registo encontrado.")
+            else: st.warning("Nenhum registro encontrado.")
 
-        # ABA 7: NOVA ABA SATISFAÇÃO (Feedbacks e Motivos Escritos)
-        with abas_sup[6]:
-            if token and 'mapa_agentes_sidebar' in locals():
-                with st.spinner("A compilar Notas e Feedbacks dos clientes..."):
-                    lista_feedbacks = buscar_dados_satisfacao(token, d_inicial, d_final, contas_tuple, mapa_agentes_sidebar)
-                    
-                    if lista_feedbacks:
-                        df_fb = pd.DataFrame(lista_feedbacks)
-                        
-                        total_respostas = len(df_fb)
-                        media_geral = df_fb["Nota"].mean() if not df_fb["Nota"].isna().all() else 0.0
-                        
-                        st.markdown("### 📊 Auditoria Qualitativa de Satisfação")
-                        
-                        c_fb1, c_fb2 = st.columns([1, 1])
-                        with c_fb1:
-                            render_kpi_card("Total de Avaliações", str(total_respostas), "Pesquisa configurada no Secrets", "#8b5cf6")
-                        with c_fb2:
-                            cor_media = "#10b981" if media_geral >= 8 else "#ef4444"
-                            render_kpi_card("Média das Notas", f"{media_geral:.1f}", "Escala definida pela pesquisa", cor_media)
-                        
-                        st.markdown("---")
-                        
-                        f_col1, f_col2 = st.columns([1, 1])
-                        with f_col1:
-                            filtro_nota = st.selectbox("Filtrar por Nota:", ["Todas as Notas", "Apenas Detratores (< 8)", "Apenas Promotores (≥ 8)"])
-                        with f_col2:
-                            filtro_agente = st.selectbox("Filtrar por Agente:", ["Toda a Equipe"] + sorted(df_fb["Agente"].unique().tolist()))
-                        
-                        df_view = df_fb.copy()
-                        if filtro_nota == "Apenas Detratores (< 8)": df_view = df_view[df_view["Nota"] < 8]
-                        elif filtro_nota == "Apenas Promotores (≥ 8)": df_view = df_view[df_view["Nota"] >= 8]
-                        
-                        if filtro_agente != "Toda a Equipe":
-                            df_view = df_view[df_view["Agente"] == filtro_agente]
-                            
-                        df_view = df_view[df_view["Comentario"].str.strip() != ""]
-                        
-                        st.markdown(f"#### 💬 Feedbacks Escritos ({len(df_view)})")
-                        
-                        if not df_view.empty:
-                            for _, row in df_view.sort_values(by="Data", ascending=False).iterrows():
-                                nota_val = row["Nota"]
-                                
-                                css_nota = "nota-baixa"
-                                if pd.isna(nota_val): 
-                                    nota_val = "?"
-                                    css_nota = "nota-media"
-                                elif nota_val >= 8: 
-                                    css_nota = "nota-alta"
-                                
-                                link_matrix = gerar_link_protocolo(row["Protocolo"])
-                                
-                                st.markdown(f"""
-                                <div class="feedback-card">
-                                    <div class="feedback-header">
-                                        <div>
-                                            <div style="color: #9ca3af; font-size: 0.8rem;">{row["Data"]} • Protocolo: {row["Protocolo"]}</div>
-                                            <div style="font-weight: 600; font-size: 1.1rem; color: #f3f4f6;">{row["Cliente"]}</div>
-                                            <div style="color: #6366f1; font-size: 0.9rem; margin-top: 2px;">Atendido por: {row["Agente"]} • {row["Servico"]}</div>
-                                        </div>
-                                        <div class="feedback-nota {css_nota}">★ {nota_val}</div>
-                                    </div>
-                                    <div class="feedback-body">
-                                        "{row["Comentario"]}"
-                                    </div>
-                                    <div style="margin-top: 10px; text-align: right;">
-                                        <a href="{link_matrix}" target="_blank" style="text-decoration: none; color: #3b82f6; font-size: 0.85rem; font-weight: bold;">
-                                            🔗 Abrir Atendimento
-                                        </a>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.info("Nenhum cliente deixou feedback escrito com os filtros selecionados.")
-                    else:
-                        st.warning("Nenhum dado encontrado para a pesquisa configurada neste período.")
-            else:
-                st.info("Aguarde o carregamento do ecrã inicial.")
-
-        # ABAS EXTRAS DE SETOR
-        abas_extras = 7 
+        # ABA 7: JOVEM APRENDIZ
         if setor_atual in ["NRC", "SUPORTE"]:
-            with abas_sup[abas_extras]:
+            idx_jovem = 6
+            with abas_sup[idx_jovem]:
                 st.markdown(f"### 👶 Painel Jovem Aprendiz - {setor_atual}")
                 
                 if token:
-                    with st.spinner("A analisar dados dos Jovens Aprendizes..."):
+                    with st.spinner("Analisando dados dos Jovens Aprendizes..."):
                         stats_ja, ranking_ja, df_pesquisas_ja, score_ja_global = buscar_dados_jovem_aprendiz(token, d_inicial, d_final, setor_atual, contas_tuple)
-                        lista_feedbacks_geral = buscar_dados_satisfacao(token, d_inicial, d_final, contas_tuple, mapa_agentes_sidebar)
                         
                         st.markdown("#### 📊 Visão Geral da Equipe Jovem Aprendiz")
                         c1, c2, c3, c4 = st.columns(4)
                         with c1: render_kpi_card("Volume Total", str(stats_ja["Volume"]), "Atendimentos", "#8b5cf6")
                         cor_csat_ja = "#10b981" if score_ja_global >= 90 else "#ef4444"
                         with c2: render_kpi_card("CSAT Geral", f"{score_ja_global:.2f}%", "Satisfação Media", cor_csat_ja)
-                        with c3: render_kpi_card("T.M.A Equipa", stats_ja["TMA"], "Tempo Médio", "#3b82f6")
-                        with c4: render_kpi_card("T.M.I.A Equipa", stats_ja["TMIA"], "Ociosidade", "#f59e0b")
+                        with c3: render_kpi_card("T.M.A Equipe", stats_ja["TMA"], "Tempo Médio", "#3b82f6")
+                        with c4: render_kpi_card("T.M.I.A Equipe", stats_ja["TMIA"], "Ociosidade", "#f59e0b")
                         
                         st.markdown("---")
                         
@@ -950,65 +667,33 @@ else:
                                 use_container_width=True, hide_index=True
                             )
                         else:
-                            st.warning("Nenhum atendimento registado pelos jovens aprendizes no período.")
+                            st.warning("Nenhum atendimento registrado pelos jovens aprendizes no período.")
                             
                         st.markdown("---")
                         
-                        st.markdown("#### 💬 Feedbacks Qualitativos Abertos (Pesquisa de Satisfação)")
-                        
-                        ids_ja_setor = JOVENS_APRENDIZES_NRC_IDS if setor_atual == "NRC" else JOVENS_APRENDIZES_SUPORTE_IDS
-                        nomes_ja_setor = [mapa_agentes_sidebar[id_ja] for id_ja in ids_ja_setor if id_ja in mapa_agentes_sidebar]
-                        
-                        df_ja_fb = pd.DataFrame(lista_feedbacks_geral)
-                        if not df_ja_fb.empty:
-                            df_ja_fb = df_ja_fb[df_ja_fb["Agente"].isin(nomes_ja_setor) & (df_ja_fb["Comentario"].str.strip() != "")]
-                        
-                        if not df_ja_fb.empty:
-                            for _, row in df_ja_fb.sort_values(by="Data", ascending=False).iterrows():
-                                nota_val = row["Nota"]
-                                
-                                css_nota = "nota-baixa"
-                                if pd.isna(nota_val):
-                                    nota_val = "?"
-                                    css_nota = "nota-media"
-                                elif nota_val >= 8:
-                                    css_nota = "nota-alta"
-                                
-                                link_matrix = gerar_link_protocolo(row["Protocolo"])
-                                
-                                st.markdown(f"""
-                                <div class="feedback-card">
-                                    <div class="feedback-header">
-                                        <div>
-                                            <div style="color: #9ca3af; font-size: 0.8rem;">{row["Data"]} • Protocolo: {row["Protocolo"]}</div>
-                                            <div style="font-weight: 600; font-size: 1.1rem; color: #f3f4f6;">{row["Cliente"]}</div>
-                                            <div style="color: #6366f1; font-size: 0.9rem; margin-top: 2px;">Jovem Aprendiz: {row["Agente"]} • {row["Servico"]}</div>
-                                        </div>
-                                        <div class="feedback-nota {css_nota}">★ {nota_val}</div>
-                                    </div>
-                                    <div class="feedback-body">
-                                        "{row["Comentario"]}"
-                                    </div>
-                                    <div style="margin-top: 10px; text-align: right;">
-                                        <a href="{link_matrix}" target="_blank" style="text-decoration: none; color: #3b82f6; font-size: 0.85rem; font-weight: bold;">
-                                            🔗 Abrir Atendimento
-                                        </a>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
+                        st.markdown("#### ⭐ Avaliações Individuais (Feedbacks)")
+                        if not df_pesquisas_ja.empty:
+                            df_pesquisas_ja['Acesso'] = df_pesquisas_ja['Protocolo'].apply(gerar_link_protocolo)
+                            st.dataframe(
+                                df_pesquisas_ja[['Data', 'Agente', 'Cliente', 'Nota', 'Comentario', 'Acesso']], 
+                                column_config={
+                                    "Acesso": st.column_config.LinkColumn("Link", display_text="Abrir Atendimento"),
+                                    "Nota": st.column_config.NumberColumn("Nota", format="%d ⭐")
+                                }, 
+                                use_container_width=True, hide_index=True
+                            )
                         else:
-                            st.info("Nenhum feedback qualitativo aberto registado para os jovens aprendizes deste setor.")
-            abas_extras += 1
+                            st.info("Sem pesquisas de satisfação registradas para os jovens aprendizes neste período.")
 
+        # ABAS EXTRAS SUPORTE
         if setor_atual == "SUPORTE":
-            with abas_sup[abas_extras]: # Plantão
+            with abas_sup[7]: # Plantão
                 df_plantao, stats_servico_plantao, _ = buscar_dados_plantao(token, d_inicial, d_final, contas_tuple)
                 if not df_plantao.empty:
                     st.dataframe(df_plantao, use_container_width=True, hide_index=True)
                 else: st.warning("Sem dados.")
-            abas_extras += 1
 
-            with abas_sup[abas_extras]: # Cliente Interno
+            with abas_sup[8]: # Cliente Interno
                 stats_ci, score_ci, total_ci, df_ci = buscar_dados_cliente_interno(token, d_inicial, d_final, SETORES_AGENTES_IDS["SUPORTE"])
                 render_kpi_card("CSAT Interno", f"{score_ci:.2f}%", f"Base: {total_ci}", "#10b981")
                 if not df_ci.empty: st.dataframe(df_ci, use_container_width=True, hide_index=True)
