@@ -32,9 +32,9 @@ try:
     IDS_PERGUNTAS_VALIDAS = st.secrets["ids"]["IDS_PERGUNTAS_VALIDAS"]
     
     # NOVAS VARIÁVEIS DA ABA DE SATISFAÇÃO (Obrigatórias no secrets)
-    PESQUISA_SATISFACAO = str(st.secrets["ids"]["PESQUISA_SATISFACAO"])
-    PERGUNTA_NOTA = str(st.secrets["ids"]["PERGUNTA_NOTA"])
-    PERGUNTA_TEXTO = str(st.secrets["ids"]["PERGUNTA_TEXTO"])
+    PESQUISA_SATISFACAO = [str(i) for i in st.secrets["ids"]["PESQUISA_SATISFACAO"]]
+    PERGUNTA_NOTA = [str(i) for i in st.secrets["ids"]["PERGUNTA_NOTA"]]
+    PERGUNTA_TEXTO = [str(i) for i in st.secrets["ids"]["PERGUNTA_TEXTO"]]
     
 except Exception as erro:
     st.error(f"⚠️ Erro crítico: Não foi possível carregar os Segredos (Secrets). Verifique a configuração no Streamlit Cloud. Detalhe: {erro}")
